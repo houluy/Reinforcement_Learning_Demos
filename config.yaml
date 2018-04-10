@@ -1,0 +1,6 @@
+size: 10
+epsilon: 0.9
+gamma: 0.9
+alpha: 0.1
+instant_reward: 1
+speed: 0.1
