@@ -42,3 +42,68 @@ to install all the dependencies for this project
 How to run
 ------------------
 
+- pip/virtualenv
+
+Run ``python3.6 find_treasure.py -h`` directly to see the help page.
+
+- pipenv
+
+Run ``pipenv run python3.6 find_treasure.py -h`` to see the help.
+
+**********
+USAGE
+**********
+
+::
+
+    usage: find_treasure.py [-h] [-l] [-r ROUNDS] [-m {t,p}] [-s] [-c CONFIG_FILE]
+
+    This is a demo to show how Q_learning makes agent intelligent
+
+    optional arguments:
+        -h, --help          show this help message and exit
+        -l, --load          Load Q table from a csv file
+        -r ROUNDS, --rounds ROUNDS
+                            Training rounds
+        -m {t,p}, --mode {t,p}
+                            Mode: oneof ["t"(train), "p"(play)]
+        -s, --show          Show the training process.
+        -c CONFIG_FILE, --config_file CONFIG_FILE
+                            Config file for significant parameters
+
+- -l
+
+Load the Q table from a csv file. The file name can be modified in the program.
+
+- -r
+
+Number of rounds to train the warrior. 
+
+
+************
+CONFIG
+************
+
+Config file must be a YAML file containing the following parameters::
+
+  size: 10
+  epsilon: 0.9
+  gamma: 0.9
+  alpha: 0.1
+  instant_reward: 1
+  speed: 0.1
+
+- size
+
+The length of the map.
+
+- epsilon
+
+The probability of choosing a random action. The other option is choosing the action which makes the Q value of current state maximum
+
+- gamma
+
+The decay rate of Q value.
+
+- alpha
+
