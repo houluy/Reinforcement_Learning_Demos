@@ -70,14 +70,25 @@ USAGE
         -c CONFIG_FILE, --config_file CONFIG_FILE
                             Config file for significant parameters
 
-- -l
+- l
 
 Load the Q table from a csv file. The file name can be modified in the program.
 
-- -r
+- r
 
 Number of rounds to train the warrior. 
 
+- m
+
+Mode. ``t`` stands for 'training', ``p`` stands for 'playing'.
+
+- s
+
+If 'training' is selected, ``s`` flag can show the process of training.
+
+- c
+
+A config file can be specified when training with this argument.
 
 ************
 CONFIG
@@ -137,7 +148,7 @@ After 20 rounds of training::
 The agent can find the treasure directly.
 
 -------------------
-THANKS
+Thanks
 -------------------
 
 `莫烦PYTHON <https://morvanzhou.github.io/tutorials/machine-learning/reinforcement-learning/2-1-general-rl/>`_
