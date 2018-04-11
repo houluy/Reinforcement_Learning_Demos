@@ -103,7 +103,13 @@ The probability of choosing a random action. The other option is choosing the ac
 
 - gamma
 
-The decay rate of Q value.
+The decay rate of the expectation of feature.
 
 - alpha
 
+
+-------------------
+THANKS
+-------------------
+
+`莫烦PYTHON: <https://morvanzhou.github.io/tutorials/machine-learning/reinforcement-learning/2-1-general-rl/>`_
