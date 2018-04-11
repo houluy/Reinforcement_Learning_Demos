@@ -1,7 +1,6 @@
-===================
-Demo for Q_learning
-===================
-
+====================
+Demos for Q_learning
+====================
 
 ------------------
 How to prepare
@@ -99,17 +98,46 @@ The length of the map.
 
 - epsilon
 
-The probability of choosing a random action. The other option is choosing the action which makes the Q value of current state maximum
+The probability of choosing a random action. The other option is choosing the action which makes the Q value of current state maximum.
 
 - gamma
 
-The decay rate of the expectation of feature.
+Discount factor.
 
 - alpha
 
+Learning rate.
+
+- instant_reward
+
+Reward for current state and action.
+
+- speed
+
+Speed of displaying.
+
+*******************
+DISPLAY
+*******************
+
+After 20 rounds of training::
+
+    o_________T
+    _o________T
+    __o_______T
+    ___o______T
+    ____o_____T
+    _____o____T
+    ______o___T
+    _______o__T
+    ________o_T
+    _________oT
+    __________o
+
+The agent can find the treasure directly.
 
 -------------------
 THANKS
 -------------------
 
-`莫烦PYTHON: <https://morvanzhou.github.io/tutorials/machine-learning/reinforcement-learning/2-1-general-rl/>`_
+`莫烦PYTHON <https://morvanzhou.github.io/tutorials/machine-learning/reinforcement-learning/2-1-general-rl/>`_
