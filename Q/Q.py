@@ -59,3 +59,5 @@ class Q:
             action = all_actions.idxmax()
         return action
 
+    def train(self):
+        pass
