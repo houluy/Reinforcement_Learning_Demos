@@ -14,6 +14,7 @@ class Q:
         available_actions,
         reward_func,
         transition_func,
+        train_steps=30,
         run=None,
         state_init_ind=0,
         state_end_ind=-1,
@@ -42,6 +43,7 @@ class Q:
         self._custom_params = custom_params
         self._custom_show = self._custom_params.get('show', None)
         self._sleep_time = sleep_time
+        self._train_steps = train_steps
 
         # Reward function
         self._reward_func = reward_func
@@ -111,9 +113,13 @@ class Q:
             action = available_actions[self._q_table.iloc[state, :].values.argmax()]
             return action
 
-    def train(self, steps=30):
-        step = steps
-        while step > 0:
+    def train(self, conv=True):
+        '''
+        conv: If conv is True, then use the self.convergence as the break condition
+        '''
+        step = self._train_steps
+        stop = True
+        while not stop:
             state = self._init_state
             state_ind = self._state_init_ind
             end = False
@@ -124,13 +130,13 @@ class Q:
                 # pdb.set_trace()
                 action = self.choose_action(state=state)
                 q_predict = self._q_table.ix[state, action]
-                instant_reward = self._reward_func(state=state, action=action)
+                reward = self._reward_func(state=state, action=action)
                 next_state_ind, next_state = self._transition_func(state=state, action=action)
                 if next_state == self._end_state:
-                    q = instant_reward
+                    q = reward
                     end = True
                 else:
-                    q = instant_reward + self._gamma * self._q_table.iloc[next_state_ind, :].max()
+                    q = reward + self._gamma * self._q_table.iloc[next_state_ind, :].max()
                 self._q_table.ix[state, action] += self._alpha * (q - q_predict)
                 state = next_state
                 state_ind = next_state_ind
@@ -138,8 +144,17 @@ class Q:
                     self._custom_show(state=state)
                     time.sleep(self._sleep_time)
             step -= 1
+            if conv:
+                stop = self.convergence()
+            else:
+                stop = step == 0
         self._save_q()
 
     def run(self):
         self._run(self.choose_optimal_action)
+
+    def convergence(self, Q=None):
+        if not Q:
+            Q = self._q_table
+        return True if (max(Q) - min(Q))/2 < self.psi else False
 
