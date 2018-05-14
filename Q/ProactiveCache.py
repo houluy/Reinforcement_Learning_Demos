@@ -15,8 +15,8 @@ def gen_st(s, k, K, i):
 
 class ProactiveCache:
     def __init__(self):
-        self.k = 3
-        self.K = 3
+        self.k = 2
+        self.K = 2
         self.V = 10
         self.C = 3
         self.L = 300
@@ -33,6 +33,7 @@ class ProactiveCache:
     def generate_states(self):
         state = [0 for x in range(self.K + 1)]
         self.space = gen_st(state, self.k, self.K, 0)
+        self.space = [tuple(x) for x in self.space]
         self.state_count = len(self.space)
         self.init_state = self.space[0]
 
@@ -72,7 +73,7 @@ class ProactiveCache:
 
     @property
     def action_set(self):
-        return self.available_action(self.init_state)
+        return self.available_actions(self.init_state)
 
 class Adaptor(ProactiveCache):
     def __init__(self):
@@ -82,5 +83,11 @@ class Adaptor(ProactiveCache):
             action_set=self.action_set,
             available_actions=self.available_actions,
             reward_func=self.reward,
-            transition_func=self.transit
+            load_q=False,
+            q_file='Q/ProactiveQ.csv',
+            transition_func=self.transit,
+            config_file='Q/Proactive.yaml'
         )
+    
+    def train(self, conv=True, heuristic=True):
+        return self.Q.train(conv=conv, heuristic=heuristic)

@@ -49,7 +49,7 @@ class Q:
         state_len, action_len = len(self._state_set), len(self._action_set)
         self._dimension = (state_len, action_len)
         self._q_file = q_file
-        self._custom_params = custom_params
+        self._custom_params = custom_params if custom_params else {}
         self._custom_show = self._custom_params.get('show', None)
         self._sleep_time = sleep_time
         self._conv = conv
@@ -102,16 +102,21 @@ class Q:
     def build_q_table(self):
         Q_table = df(
             np.zeros(self._dimension),
+            index=self._state_set,
             columns=self._action_set,
         )
         return Q_table
+    
+    @property
+    def q_table(self):
+        return self._q_table
 
     def choose_action(self, state):
         available_actions = self._available_actions(state=state)
         if (len(available_actions) == 1):
             return available_actions[0]
         else:
-            all_Q = self._q_table.iloc[state, :]
+            all_Q = self._q_table.ix[state, :]
             if (np.random.uniform() > self._epsilon) or (all_Q.all() == 0):
                 action = np.random.choice(available_actions)
                 #action_ind = np.where(self._action_set == action)[0][0] # Actions must be numpy array
@@ -125,7 +130,7 @@ class Q:
         if (len(available_actions) == 1):
             return available_actions[0]
         else:
-            action = available_actions[self._q_table.iloc[state, :].values.argmax()]
+            action = available_actions[self._q_table.ix[state, :].values.argmax()]
             return action
 
     def choose_heuristic_action(self, state):
@@ -173,7 +178,7 @@ class Q:
                     end = True
                 else:
                     q = reward + self._gamma * self._q_table.ix[next_state_ind, :].max()
-                self._H_table.iloc[state, :] = 0
+                self._H_table.ix[state, :] = 0
                 self._H_table.ix[state, action] = self._q_table.ix[state, :].max() - self._q_table.ix[state, action] + self._eta
                 self._q_table.ix[state, action] += self._alpha * (q - q_predict)
                 state = next_state

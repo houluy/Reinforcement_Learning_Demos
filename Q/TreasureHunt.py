@@ -132,7 +132,7 @@ class Adaptor(TreasureHunt):
             conv=False,
             run=self.play,
             instant_reward=self._instant_reward,
-            q_file='Q/q.csv',
+            q_file='Q/TreasureQ.csv',
             load_q=False,
             config_file='Q/treasure.yaml',
             display=False,
