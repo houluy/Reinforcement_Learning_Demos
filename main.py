@@ -1,5 +1,8 @@
+import Q.ProactiveCache
 import Q.TreasureHunt
 
-agent = Q.TreasureHunt.Adaptor()
-agent.train()
-agent.run()
+#pc = Q.ProactiveCache.Adaptor()
+#pc.train()
+
+th = Q.TreasureHunt.Adaptor()
+th.train()

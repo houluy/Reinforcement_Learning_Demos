@@ -3,6 +3,7 @@ import pdb
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import time
 df = pd.DataFrame
 
@@ -44,6 +45,7 @@ class Q:
         self._custom_show = self._custom_params.get('show', None)
         self._sleep_time = sleep_time
         self._train_steps = train_steps
+        self.conv = []
 
         # Reward function
         self._reward_func = reward_func
@@ -68,8 +70,8 @@ class Q:
             self._instant_reward = instant_reward
 
     def _load_config(self, config):
-        seq = ['epsilon', 'gamma', 'alpha', 'instant_reward']
-        self._epsilon, self._gamma, self._alpha, self._instant_reward = [config.get(x) for x in seq]
+        seq = ['epsilon', 'gamma', 'alpha', 'instant_reward', 'phi']
+        self._epsilon, self._gamma, self._alpha, self._instant_reward, self._phi = [config.get(x) for x in seq]
 
     def _load_q(self, file_name=None):
         if file_name is None:
@@ -117,13 +119,15 @@ class Q:
         '''
         conv: If conv is True, then use the self.convergence as the break condition
         '''
-        step = self._train_steps
-        stop = True
+        total_step = self._train_steps
+        step = 0
+        stop = False
+        last_Q = self._q_table.copy()
         while not stop:
             state = self._init_state
             state_ind = self._state_init_ind
             end = False
-            self._display_train_info(train_round=steps - step)
+            self._display_train_info(train_round=step)
             if self._custom_show:
                 self._custom_show(state=state)
             while not end:
@@ -143,18 +147,34 @@ class Q:
                 if self._custom_show:
                     self._custom_show(state=state)
                     time.sleep(self._sleep_time)
-            step -= 1
+            step += 1
             if conv:
-                stop = self.convergence()
+                if step >= 100:
+                    stop = True
+                stop = self.convergence(self._q_table.subtract(last_Q))
             else:
-                stop = step == 0
+                last_Q = self._q_table.copy()
+                stop = step == total_step
         self._save_q()
 
-    def run(self):
-        self._run(self.choose_optimal_action)
+    def plot_conv(self):
+        plt.plot(range(len(self.conv)), self.conv)
 
-    def convergence(self, Q=None):
-        if not Q:
-            Q = self._q_table
-        return True if (max(Q) - min(Q))/2 < self.psi else False
+    def run(self):
+        if self._run:
+            self._run(self.choose_optimal_action)
+
+    def convergence(self, delta_Q=None):
+        count = 0
+        steps = delta_Q.shape[0]
+        for i in range(steps):
+            Q_s = delta_Q.ix[i, :]
+            Psi = (max(Q_s) - min(Q_s))/2
+            count += Psi
+        mean = count/steps
+        self.conv.append(mean)
+        if mean < self._phi:
+            return True
+        else:
+            return False
 

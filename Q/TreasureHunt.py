@@ -130,7 +130,8 @@ class Adaptor(TreasureHunt):
             run=self.play,
             instant_reward=self._instant_reward,
             q_file='Q/q.csv',
-            config_file='Q/config.yaml',
+            load_q=False,
+            config_file='Q/treasure.yaml',
             custom_params=self.custom_params
         )
 
@@ -152,8 +153,8 @@ class Adaptor(TreasureHunt):
         else:
             return self._action_set
 
-    def train(self):
-        self.Q.train()
+    def train(self, conv=True):
+        self.Q.train(conv=conv)
 
     def play(self, choose_optimal_action):
         state = self._init_state
