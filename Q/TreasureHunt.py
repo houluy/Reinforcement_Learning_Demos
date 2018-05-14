@@ -7,14 +7,16 @@ import numpy as np
 df = pd.DataFrame
 
 import argparse
-import yaml
 import functools
 from Q.Q import Q
 
-from colorline import cprint
+# from colorline import cprint
 
-oprint = functools.partial(cprint, color='b', bcolor='k', end='')
-tprint = functools.partial(cprint, color='r', bcolor='k', end='')
+#oprint = functools.partial(cprint, color='b', bcolor='k', end='')
+#tprint = functools.partial(cprint, color='r', bcolor='k', end='')
+
+oprint = functools.partial(print, end='')
+tprint = functools.partial(print, end='')
 
 parser = argparse.ArgumentParser(description='This is a demo to show how Q_learning makes agent intelligent')
 parser.add_argument('-l', '--load', help='Load Q table from a csv file', action='store_true')
@@ -24,7 +26,7 @@ parser.add_argument('-s', '--show', help='Show the training process.', action='s
 parser.add_argument('-c', '--config_file', help='Config file for significant parameters', default=None)
 
 class TreasureHunt:
-    def __init__(self, speed=0.5, size=5):
+    def __init__(self, speed=0.5, size=8):
         self._size = size
         self._state_set = list(range(self._size))
         self._action_set = [-1, 1] # 0 stands for left, 1 stands for right
@@ -40,7 +42,7 @@ class TreasureHunt:
         self._left = -1
         self._right = 1
         self.custom_params = {
-            'show': self.print_map,
+            'show': None, #self.print_map,
         }
 
     def init(self):
@@ -127,11 +129,13 @@ class Adaptor(TreasureHunt):
             available_actions=self.available_actions,
             reward_func=self.reward,
             transition_func=self.transfer,
+            conv=False,
             run=self.play,
             instant_reward=self._instant_reward,
             q_file='Q/q.csv',
             load_q=False,
             config_file='Q/treasure.yaml',
+            display=False,
             custom_params=self.custom_params
         )
 
@@ -153,8 +157,8 @@ class Adaptor(TreasureHunt):
         else:
             return self._action_set
 
-    def train(self, conv=True):
-        self.Q.train(conv=conv)
+    def train(self, conv=True, heuristic=True):
+        return self.Q.train(conv=conv, heuristic=heuristic)
 
     def play(self, choose_optimal_action):
         state = self._init_state

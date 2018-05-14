@@ -3,5 +3,5 @@ epsilon: 0.9
 gamma: 0.9
 alpha: 0.1
 instant_reward: 10
-phi: 0.001
+phi: 0.000001
 speed: 0.1

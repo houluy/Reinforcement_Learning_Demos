@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import time
 df = pd.DataFrame
 
+class OutOfRangeException(Exception):
+    pass
+
 class Q:
     def __init__(
         self,
@@ -15,7 +18,8 @@ class Q:
         available_actions,
         reward_func,
         transition_func,
-        train_steps=30,
+        conv=True,
+        train_steps=300,
         run=None,
         state_init_ind=0,
         state_end_ind=-1,
@@ -26,8 +30,12 @@ class Q:
         epsilon=None,
         gamma=None,
         alpha=None,
+        eta=1,
+        iota=0.8,
         instant_reward=None,
-        sleep_time=0.01,
+        display=True,
+        maximum_iteration=1000,
+        sleep_time=0,
     ):
         # Define state and action
         self._state_set = state_set
@@ -44,8 +52,13 @@ class Q:
         self._custom_params = custom_params
         self._custom_show = self._custom_params.get('show', None)
         self._sleep_time = sleep_time
+        self._conv = conv
         self._train_steps = train_steps
-        self.conv = []
+        self._display = display
+        self._maximum_iteration = maximum_iteration
+        self._H_table = self.build_q_table() # Heurisitc algorithm
+        self._eta = eta
+        self._iota = iota
 
         # Reward function
         self._reward_func = reward_func
@@ -87,11 +100,11 @@ class Q:
         print('Q table: {}'.format(self._q_table))
 
     def build_q_table(self):
-        self._q_table = df(
+        Q_table = df(
             np.zeros(self._dimension),
             columns=self._action_set,
         )
-        return self._q_table
+        return Q_table
 
     def choose_action(self, state):
         available_actions = self._available_actions(state=state)
@@ -115,24 +128,43 @@ class Q:
             action = available_actions[self._q_table.iloc[state, :].values.argmax()]
             return action
 
-    def train(self, conv=True):
+    def choose_heuristic_action(self, state):
+        available_actions = self._available_actions(state=state)
+        if (len(available_actions) == 1):
+            return available_actions[0]
+        else:
+            all_Q = self._q_table.ix[state, :] + self._iota*self._H_table.ix[state, :]
+            if (np.random.uniform() > self._epsilon) or (all_Q.all() == 0):
+                action = np.random.choice(available_actions)
+                #action_ind = np.where(self._action_set == action)[0][0] # Actions must be numpy array
+            else:
+                action = available_actions[all_Q.values.argmax()]
+            return action
+
+    def train(self, conv=True, heuristic=False):
         '''
         conv: If conv is True, then use the self.convergence as the break condition
         '''
         total_step = self._train_steps
         step = 0
         stop = False
-        last_Q = self._q_table.copy()
+        self._q_table = self.build_q_table()
+        self._H_table = self.build_q_table() # Heurisitc algorithm
+        init_Q = self._q_table.copy()
+        self.conv = []
         while not stop:
             state = self._init_state
-            state_ind = self._state_init_ind
             end = False
-            self._display_train_info(train_round=step)
-            if self._custom_show:
-                self._custom_show(state=state)
+            if self._display:
+                self._display_train_info(train_round=step)
+                if self._custom_show:
+                    self._custom_show(state=state)
             while not end:
                 # pdb.set_trace()
-                action = self.choose_action(state=state)
+                if not heuristic:
+                    action = self.choose_action(state=state)
+                else:
+                    action = self.choose_heuristic_action(state=state)
                 q_predict = self._q_table.ix[state, action]
                 reward = self._reward_func(state=state, action=action)
                 next_state_ind, next_state = self._transition_func(state=state, action=action)
@@ -140,24 +172,32 @@ class Q:
                     q = reward
                     end = True
                 else:
-                    q = reward + self._gamma * self._q_table.iloc[next_state_ind, :].max()
+                    q = reward + self._gamma * self._q_table.ix[next_state_ind, :].max()
+                self._H_table.iloc[state, :] = 0
+                self._H_table.ix[state, action] = self._q_table.ix[state, :].max() - self._q_table.ix[state, action] + self._eta
                 self._q_table.ix[state, action] += self._alpha * (q - q_predict)
                 state = next_state
-                state_ind = next_state_ind
-                if self._custom_show:
-                    self._custom_show(state=state)
-                    time.sleep(self._sleep_time)
+                if self._display:
+                    if self._custom_show:
+                        self._custom_show(state=state)
+                        time.sleep(self._sleep_time)
             step += 1
-            if conv:
-                if step >= 100:
-                    stop = True
-                stop = self.convergence(self._q_table.subtract(last_Q))
+            if self._conv:
+                if step >= self._maximum_iteration:
+                    raise OutOfRangeException('The iteration time has exceeded the maximum value')
+                else:
+                    stop = self.convergence(self._q_table.subtract(init_Q))
+                    #last_Q = self._q_table.copy()
             else:
-                last_Q = self._q_table.copy()
+                #last_Q = self._q_table.copy()
+                self.convergence(self._q_table.subtract(init_Q))
                 stop = step == total_step
+        #self.plot_conv()
         self._save_q()
+        return self.conv
 
     def plot_conv(self):
+        plt.figure()
         plt.plot(range(len(self.conv)), self.conv)
 
     def run(self):
@@ -165,16 +205,11 @@ class Q:
             self._run(self.choose_optimal_action)
 
     def convergence(self, delta_Q=None):
-        count = 0
-        steps = delta_Q.shape[0]
-        for i in range(steps):
-            Q_s = delta_Q.ix[i, :]
-            Psi = (max(Q_s) - min(Q_s))/2
-            count += Psi
-        mean = count/steps
-        self.conv.append(mean)
-        if mean < self._phi:
+        Q_sum = delta_Q.sum().sum()
+        self.conv.append(Q_sum)
+        if len(self.conv) > 2 and 0 <= Q_sum - self.conv[-2] < self._phi:
             return True
         else:
             return False
+
 
