@@ -16,7 +16,7 @@ def gen_st(s, k, K, i):
 
 class ProactiveCache:
     def __init__(self):
-        self.k = 1
+        self.k = 2
         self.K = 1
         self.V = 10
         self.C = 3
@@ -47,7 +47,7 @@ class ProactiveCache:
         return actions
 
     def reward(self, state, action):
-        return self.zeta*self.time_ell(action) + (1 - self.zeta)*self.u*self.occupation(state=state, action=action)
+        return 1000 - (self.zeta*self.time_ell(action) + (1 - self.zeta)*self.u*self.occupation(state=state, action=action))
 
     def transit(self, state, action):
         if action[1] == 0:

@@ -20,7 +20,7 @@ class Q:
         reward_func,
         transition_func,
         conv=True,
-        train_steps=300,
+        train_steps=150,
         run=None,
         state_init_ind=0,
         state_end_ind=-1,
@@ -32,10 +32,10 @@ class Q:
         gamma=None,
         alpha=None,
         eta=1,
-        iota=0.8,
+        iota=0.3,
         instant_reward=None,
         display=True,
-        maximum_iteration=1000,
+        maximum_iteration=10000,
         sleep_time=0,
     ):
         # Define state and action
