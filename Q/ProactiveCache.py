@@ -16,8 +16,8 @@ def gen_st(s, k, K, i):
 
 class ProactiveCache:
     def __init__(self):
-        self.k = 2
-        self.K = 1
+        self.k = 1
+        self.K = 2
         self.V = 10
         self.C = 3
         self.L = 300
@@ -39,10 +39,10 @@ class ProactiveCache:
         self.init_state = self.space[0]
 
     def available_actions(self, state):
-        actions = [(0, 0)]
+        actions = [tuple(0 for x in range(self.k + 1))]
         for rsu, s in enumerate(state):
             if s < self.K:
-                for a in range(1, self.K - s + 1):
+                for a in range(1, self.K - s):
                     actions.append((rsu, a))
         return actions
 

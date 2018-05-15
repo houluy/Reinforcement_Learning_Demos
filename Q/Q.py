@@ -171,7 +171,6 @@ class Q:
                 if self._custom_show:
                     self._custom_show(state=state)
             while not end:
-                #pdb.set_trace()
                 if not heuristic:
                     action = self.choose_action(state=state)
                 else:
