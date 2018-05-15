@@ -19,8 +19,7 @@ class Q:
         available_actions,
         reward_func,
         transition_func,
-        conv=True,
-        train_steps=150,
+        train_steps=300,
         run=None,
         state_init_ind=0,
         state_end_ind=-1,
@@ -31,8 +30,8 @@ class Q:
         epsilon=None,
         gamma=None,
         alpha=None,
-        eta=1,
-        iota=0.3,
+        eta=0.5,
+        iota=0.9,
         instant_reward=None,
         display=True,
         maximum_iteration=10000,
@@ -53,7 +52,6 @@ class Q:
         self._custom_params = custom_params if custom_params else {}
         self._custom_show = self._custom_params.get('show', None)
         self._sleep_time = sleep_time
-        self._conv = conv
         self._train_steps = train_steps
         self._display = display
         self._maximum_iteration = maximum_iteration
@@ -193,7 +191,7 @@ class Q:
                         self._custom_show(state=state)
                         time.sleep(self._sleep_time)
             step += 1
-            if self._conv:
+            if conv:
                 if step >= self._maximum_iteration:
                     raise OutOfRangeException('The iteration time has exceeded the maximum value')
                 else:
@@ -202,7 +200,7 @@ class Q:
             else:
                 #last_Q = self._q_table.copy()
                 self.convergence(self._q_table.subtract(init_Q))
-                stop = step == total_step
+                stop = (step == total_step)
         #self.plot_conv()
         self._save_q()
         return self.conv

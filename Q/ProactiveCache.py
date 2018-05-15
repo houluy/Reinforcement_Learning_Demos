@@ -20,12 +20,12 @@ class ProactiveCache:
         self.K = 2
         self.V = 10
         self.C = 3
-        self.L = 300
+        self.L = 30/4
         self.u = self.L/self.C
         self.nu = 10
         self.mu = 100
         self.rho = 0.9
-        self.zeta = 0.5
+        self.zeta = 0.8
         self.req_air = 100
         self.req_line = 1000
         self.req_time = self.req_air + self.req_line
@@ -47,7 +47,7 @@ class ProactiveCache:
         return actions
 
     def reward(self, state, action):
-        return 1000 - (self.zeta*self.time_ell(action) + (1 - self.zeta)*self.u*self.occupation(state=state, action=action))
+        return -(self.zeta*self.time_ell(action)*(10**(-3)) + (1 - self.zeta)*self.u*self.occupation(state=state, action=action))
 
     def transit(self, state, action):
         if action[1] == 0:
