@@ -101,7 +101,8 @@ class Q:
 
     def _display_train_info(self, train_round):
         print('train_round: {}'.format(train_round))
-        print('Q table: {}'.format(self._q_table))
+        #print('Convergence: {}'.format(self.conv[-1] - self.conv[-2] if len(self.conv) > 1 else self.conv[-1]))
+        #print('Q table: {}'.format(self._q_table))
 
     def build_q_table(self):
         index = [hash(x) for x in self._state_set]
@@ -161,7 +162,7 @@ class Q:
         self._q_table = self.build_q_table()
         self._H_table = self.build_q_table() # Heurisitc algorithm
         init_Q = self._q_table.copy()
-        self.conv = []
+        self.conv = [0]
         while not stop:
             #pdb.set_trace()
             state = self._init_state

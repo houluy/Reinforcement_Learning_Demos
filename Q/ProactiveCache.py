@@ -3,20 +3,20 @@ import pdb
 
 def gen_st(s, k, K, i):
     new = []
-    if i == K:
-        for j in range(k + 1):
+    if i == k:
+        for j in range(K + 1):
             s[i] = j
             new.append(s[:])
         return new
     else:
-        for j in range(k + 1):
+        for j in range(K + 1):
             s[i] = j
             new += gen_st(s, k, K, i + 1)
         return new
 
 class ProactiveCache:
     def __init__(self):
-        self.k = 1
+        self.k = 2
         self.K = 2
         self.V = 10
         self.C = 3
@@ -32,7 +32,7 @@ class ProactiveCache:
         self.generate_states()
 
     def generate_states(self):
-        state = [0 for x in range(self.K + 1)]
+        state = [0 for x in range(self.k + 1)]
         self.space = gen_st(state, self.k, self.K, 0)
         self.space = [tuple(x) for x in self.space]
         self.state_count = len(self.space)
@@ -42,7 +42,7 @@ class ProactiveCache:
         actions = [tuple(0 for x in range(self.k + 1))]
         for rsu, s in enumerate(state):
             if s < self.K:
-                for a in range(1, self.K - s):
+                for a in range(1, self.K - s + 1):
                     actions.append((rsu, a))
         return actions
 
@@ -89,7 +89,7 @@ class Adaptor(ProactiveCache):
             q_file='Q/ProactiveQ.csv',
             transition_func=self.transit,
             config_file='Q/Proactive.yaml',
-            display=False,
+            display=True,
         )
 
     def train(self, conv=True, heuristic=True):
