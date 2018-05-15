@@ -1,10 +1,16 @@
 import Q.ProactiveCache
 import Q.TreasureHunt
 import matplotlib.pyplot as plt
+import pdb, traceback, sys
 
 pc = Q.ProactiveCache.Adaptor()
 #print(pc.Q.q_table.ix[1, (0,0)])
-conv = pc.train(heuristic=False)
+try:
+    conv = pc.train(heuristic=False)
+except:
+    type, value, tb = sys.exc_info()
+    traceback.print_exc()
+    pdb.post_mortem(tb)
 #pc.train()
 
 #th = Q.TreasureHunt.Adaptor()

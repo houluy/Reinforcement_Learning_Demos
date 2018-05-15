@@ -2,6 +2,7 @@ import yaml
 import pdb
 
 import numpy as np
+import random
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
@@ -59,6 +60,9 @@ class Q:
         self._H_table = self.build_q_table() # Heurisitc algorithm
         self._eta = eta
         self._iota = iota
+        self._hash_lookup_table = {
+            hash(x): x for x in set(self._state_set + self._action_set)
+        }
 
         # Reward function
         self._reward_func = reward_func
@@ -100,13 +104,15 @@ class Q:
         print('Q table: {}'.format(self._q_table))
 
     def build_q_table(self):
+        index = [hash(x) for x in self._state_set]
+        columns = [hash(x) for x in self._action_set]
         Q_table = df(
             np.zeros(self._dimension),
-            index=self._state_set,
-            columns=self._action_set,
+            index=index,
+            columns=columns,
         )
         return Q_table
-    
+
     @property
     def q_table(self):
         return self._q_table
@@ -116,13 +122,12 @@ class Q:
         if (len(available_actions) == 1):
             return available_actions[0]
         else:
-            all_Q = self._q_table.ix[state, :]
+            all_Q = self._q_table.ix[hash(state), :]
             if (np.random.uniform() > self._epsilon) or (all_Q.all() == 0):
-                action = np.random.choice(available_actions)
+                action = random.choice(available_actions)
                 #action_ind = np.where(self._action_set == action)[0][0] # Actions must be numpy array
             else:
-                action = available_actions[all_Q.values.argmax()]
-                #action_ind = all_Q.values.argmax()
+                action = self._hash_lookup_table.get(all_Q.idxmax())
             return action
 
     def choose_optimal_action(self, state):
@@ -130,7 +135,7 @@ class Q:
         if (len(available_actions) == 1):
             return available_actions[0]
         else:
-            action = available_actions[self._q_table.ix[state, :].values.argmax()]
+            action = self._hash_lookup_table.get(self._q_table.ix[hash(state), :].idxmax())
             return action
 
     def choose_heuristic_action(self, state):
@@ -138,12 +143,12 @@ class Q:
         if (len(available_actions) == 1):
             return available_actions[0]
         else:
-            all_Q = self._q_table.ix[state, :] + self._iota*self._H_table.ix[state, :]
+            all_Q = self._q_table.ix[hash(state), :] + self._iota*self._H_table.ix[hash(state), :]
             if (np.random.uniform() > self._epsilon) or (all_Q.all() == 0):
-                action = np.random.choice(available_actions)
+                action = random.choice(available_actions)
                 #action_ind = np.where(self._action_set == action)[0][0] # Actions must be numpy array
             else:
-                action = available_actions[all_Q.values.argmax()]
+                action = self._hash_lookup_table.get(all_Q.idxmax())
             return action
 
     def train(self, conv=True, heuristic=False):
@@ -158,6 +163,7 @@ class Q:
         init_Q = self._q_table.copy()
         self.conv = []
         while not stop:
+            #pdb.set_trace()
             state = self._init_state
             end = False
             if self._display:
@@ -165,22 +171,22 @@ class Q:
                 if self._custom_show:
                     self._custom_show(state=state)
             while not end:
-                # pdb.set_trace()
+                #pdb.set_trace()
                 if not heuristic:
                     action = self.choose_action(state=state)
                 else:
                     action = self.choose_heuristic_action(state=state)
-                q_predict = self._q_table.ix[state, action]
+                q_predict = self._q_table.ix[hash(state), hash(action)]
                 reward = self._reward_func(state=state, action=action)
-                next_state_ind, next_state = self._transition_func(state=state, action=action)
+                next_state = self._transition_func(state=state, action=action)
                 if next_state == self._end_state:
                     q = reward
                     end = True
                 else:
-                    q = reward + self._gamma * self._q_table.ix[next_state_ind, :].max()
-                self._H_table.ix[state, :] = 0
-                self._H_table.ix[state, action] = self._q_table.ix[state, :].max() - self._q_table.ix[state, action] + self._eta
-                self._q_table.ix[state, action] += self._alpha * (q - q_predict)
+                    q = reward + self._gamma * self._q_table.ix[hash(next_state), :].max()
+                self._H_table.ix[hash(state), :] = 0
+                self._H_table.ix[hash(state), hash(action)] = self._q_table.ix[hash(state), :].max() - self._q_table.ix[hash(state), hash(action)] + self._eta
+                self._q_table.ix[hash(state), hash(action)] += self._alpha * (q - q_predict)
                 state = next_state
                 if self._display:
                     if self._custom_show:

@@ -1,4 +1,5 @@
 from Q.Q import Q
+import pdb
 
 def gen_st(s, k, K, i):
     new = []
@@ -15,8 +16,8 @@ def gen_st(s, k, K, i):
 
 class ProactiveCache:
     def __init__(self):
-        self.k = 2
-        self.K = 2
+        self.k = 1
+        self.K = 1
         self.V = 10
         self.C = 3
         self.L = 300
@@ -25,7 +26,7 @@ class ProactiveCache:
         self.mu = 100
         self.rho = 0.9
         self.zeta = 0.5
-        self.req_air = 10
+        self.req_air = 100
         self.req_line = 1000
         self.req_time = self.req_air + self.req_line
         self.generate_states()
@@ -46,14 +47,15 @@ class ProactiveCache:
         return actions
 
     def reward(self, state, action):
-        self.zeta*self.time_ell(action) + (1 - self.zeta)*self.u*self.occupation(state=state, action=action)
+        return self.zeta*self.time_ell(action) + (1 - self.zeta)*self.u*self.occupation(state=state, action=action)
 
     def transit(self, state, action):
         if action[1] == 0:
             return state
         else:
+            state = list(state)
             state[action[0]] += action[1]
-            return state[:]
+            return tuple(state)
 
     def occupation(self, state, action):
         return sum(state) + action[1]
@@ -62,7 +64,7 @@ class ProactiveCache:
         if action[1] == 0:
             return self.t_m
         else:
-            return self.rho*self.t_h + (1 - self.rho)*self.t_m
+            return self.rho*self.t_h(action) + (1 - self.rho)*self.t_m
 
     @property
     def t_m(self):
@@ -86,8 +88,9 @@ class Adaptor(ProactiveCache):
             load_q=False,
             q_file='Q/ProactiveQ.csv',
             transition_func=self.transit,
-            config_file='Q/Proactive.yaml'
+            config_file='Q/Proactive.yaml',
+            display=False,
         )
-    
+
     def train(self, conv=True, heuristic=True):
         return self.Q.train(conv=conv, heuristic=heuristic)
