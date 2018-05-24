@@ -1,44 +1,38 @@
-import Q.ProactiveCache
-import Q.TreasureHunt
+import Q.TreasureHunt.TreasureHunt as TreasureHunt
+
 import matplotlib.pyplot as plt
+import argparse
 import pdb, traceback, sys
 
-class OutOfRangeException(Exception):
+parser = argparse.ArgumentParser(description='This is a demo to show how Q_learning makes agent intelligent')
+
+mode_parser = parser.add_subparsers(title='mode', help='Choose a mode')
+
+train_parser = mode_parser.add_parser('train', help='Train an agent')
+run_parser = mode_parser.add_parser('run', help='Make an agent run')
+
+parser.add_argument('-l', '--load', help='Whether to load Q table from a csv file', action='store_true')
+parser.add_argument('-d', '--demo', help='Choose a demo to run', choices=['t'], default='t')
+parser.add_argument('-s', '--show', help='Show the training process.', action='store_true', default=False)
+parser.add_argument('-c', '--config_file', help='Config file for significant parameters', default=None)
+train_parser.add_argument('-m', '--mode', help='Training mode, by rounds or by convergence', choices=['c', 'r'], default='c')
+train_parser.add_argument('-r', '--round', help='Training rounds, neglect when convergence is chosen', default=300)
+
+def args_train(args):
     pass
 
-pc = Q.ProactiveCache.Adaptor()
+def args_run(args):
+    pass
 
-#print(pc.u*pc.occupation(state=(0, 1), action=(1, 1)))
+args = parser.parse_args()
+#train_args = train_parser.parse_args()
+print(args)
+#print(train_args)
 
-
-#print(pc.Q.q_table.ix[1, (0,0)])
-try:
-    conv = pc.train(conv=True, heuristic=False)
-    heu_conv = pc.train(conv=True, heuristic=True)
-except:
-    type, value, tb = sys.exc_info()
-    traceback.print_exc()
-    pdb.post_mortem(tb)
-#with open('results.csv', 'w') as f:
-#    [f.write('{},'.format(x)) for x in conv]
-#    f.write('\n')
-#    [f.write('{},'.format(x)) for x in heu_conv]
-#pc.train()
-print(pc.Q.q_table.mean().mean())
-plt.plot(range(len(conv)), conv, label='normal')
-plt.plot(range(len(heu_conv)), heu_conv, label='heuristic')
-plt.legend()
-plt.show()
-print(pc.time_ell((2, 2))*(10**-3))
-print(pc.time_ell((1, 1))*(10**-3))
-print(pc.time_ell((0, 0))*(10**-3))
-print(pc.u*pc.occupation(state=(0, 1), action=(1, 1)))
-print(pc.u*pc.occupation(state=(0, 2), action=(1, 1)))
-print(pc.u*pc.occupation(state=(2, 2), action=(0, 0)))
-##th = Q.TreasureHunt.Adaptor()
-##conv_heu = th.train()
-##conv_nor = th.train(heuristic=False)
-#
-##plt.plot(range(len(conv_nor)), conv_nor, label='normal')
-##plt.plot(range(len(conv_heu)), conv_heu, label='heuristic')
-
+#try:
+#    th = TreasureHunt.Adaptor()
+#    th.train()
+#except:
+#    type, value, tb = sys.exc_info()
+#    traceback.print_exc()
+#    pdb.post_mortem(tb)

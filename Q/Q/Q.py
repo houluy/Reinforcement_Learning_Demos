@@ -30,11 +30,10 @@ class Q:
         epsilon=None,
         gamma=None,
         alpha=None,
-        eta=0.5,
+        eta=0.9,
         iota=0.9,
-        instant_reward=None,
         display=True,
-        maximum_iteration=10000,
+        maximum_iteration=200000,
         sleep_time=0,
     ):
         # Define state and action
@@ -162,7 +161,6 @@ class Q:
         init_Q = self._q_table.copy()
         self.conv = [0]
         while not stop:
-            #pdb.set_trace()
             state = self._init_state
             end = False
             if self._display:
