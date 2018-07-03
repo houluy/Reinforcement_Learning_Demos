@@ -6,9 +6,14 @@ import random
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
+from pathlib import Path
+
 df = pd.DataFrame
 
 class OutOfRangeException(Exception):
+    pass
+
+class QFileNotFoundError(OSError):
     pass
 
 class Q:
@@ -21,11 +26,11 @@ class Q:
         transition_func,
         train_steps=300,
         run=None,
-        state_init_ind=0,
-        state_end_ind=-1,
+        start_at=0,
+        end_at=[-1],
         config_file=None,
         q_file=None,
-        load_q=True,
+        load=True,
         custom_params=None,
         epsilon=None,
         gamma=None,
@@ -35,24 +40,26 @@ class Q:
         display=True,
         maximum_iteration=200000,
         sleep_time=0,
+        heuristic=False,
+        quit_mode='c',
     ):
         # Define state and action
         self._state_set = state_set
-        self._state_init_ind = state_init_ind
-        self._state_end_ind = state_end_ind
-        self._init_state = self._state_set[self._state_init_ind]
-        self._end_state = self._state_set[self._state_end_ind]
+        self._state_start_at = start_at
+        self._state_end_at = end_at
+        self._init_state = self._state_set[self._state_start_at]
+        self._end_state = [self._state_set[x] for x in self._state_end_at]
         self._action_set = action_set
         self._available_actions = available_actions # Map between state and available actions
         self._run = run
         state_len, action_len = len(self._state_set), len(self._action_set)
         self._dimension = (state_len, action_len)
-        self._q_file = q_file
+        self._q_file = Path(q_file)
         self._custom_params = custom_params if custom_params else {}
         self._custom_show = self._custom_params.get('show', None)
         self._sleep_time = sleep_time
         self._train_steps = train_steps
-        self._display = display
+        self._display_flag = display
         self._maximum_iteration = maximum_iteration
         self._H_table = self.build_q_table() # Heurisitc algorithm
         self._eta = eta
@@ -68,8 +75,10 @@ class Q:
         self._transition_func = transition_func
 
         # Generate Q table
-        if load_q:
-            self._q_table = self._load_q(file_name=q_file)
+        if load:
+            if not self._q_file.is_file():
+                raise QFileNotFoundError('Please check if the Q file exists at: {}'.format(q_file))
+            self._q_table = self._load_q(file_name=self._q_file)
         else:
             self._q_table = self.build_q_table()
 
@@ -81,11 +90,13 @@ class Q:
             self._epsilon = epsilon
             self._gamma = gamma
             self._alpha = alpha
-            self._instant_reward = instant_reward
+
+        self._heuristic = heuristic
+        self._quit_mode = quit_mode
 
     def _load_config(self, config):
-        seq = ['epsilon', 'gamma', 'alpha', 'instant_reward', 'phi']
-        self._epsilon, self._gamma, self._alpha, self._instant_reward, self._phi = [config.get(x) for x in seq]
+        seq = ['epsilon', 'gamma', 'alpha', 'phi']
+        self._epsilon, self._gamma, self._alpha, self._phi = [config.get(x) for x in seq]
 
     def _load_q(self, file_name=None):
         if file_name is None:
@@ -95,6 +106,15 @@ class Q:
 
     def _save_q(self):
         self._q_table.to_csv(self._q_file, index=False)
+
+    def _display(self, info=False, sleep=True, state=None):
+        if self._display_flag:
+            if info is not False:
+                self._display_train_info(train_round=info)
+            if self._custom_show:
+                self._custom_show(state=state)
+                if sleep:
+                    time.sleep(self._sleep_time)
 
     def _display_train_info(self, train_round):
         print('train_round: {}'.format(train_round))
@@ -149,7 +169,8 @@ class Q:
                 action = self._hash_lookup_table.get(all_Q.idxmax())
             return action
 
-    def train(self, conv=True, heuristic=False):
+    
+    def train(self):
         '''
         conv: If conv is True, then use the self.convergence as the break condition
         '''
@@ -163,19 +184,16 @@ class Q:
         while not stop:
             state = self._init_state
             end = False
-            if self._display:
-                self._display_train_info(train_round=step)
-                if self._custom_show:
-                    self._custom_show(state=state)
+            self._display(info=step, sleep=False, state=state)
             while not end:
-                if not heuristic:
+                if not self._heuristic:
                     action = self.choose_action(state=state)
                 else:
                     action = self.choose_heuristic_action(state=state)
                 q_predict = self._q_table.ix[hash(state), hash(action)]
                 reward = self._reward_func(state=state, action=action)
                 next_state = self._transition_func(state=state, action=action)
-                if next_state == self._end_state:
+                if next_state in self._end_state:
                     q = reward
                     end = True
                 else:
@@ -184,12 +202,9 @@ class Q:
                 self._H_table.ix[hash(state), hash(action)] = self._q_table.ix[hash(state), :].max() - self._q_table.ix[hash(state), hash(action)] + self._eta
                 self._q_table.ix[hash(state), hash(action)] += self._alpha * (q - q_predict)
                 state = next_state
-                if self._display:
-                    if self._custom_show:
-                        self._custom_show(state=state)
-                        time.sleep(self._sleep_time)
+                self._display(state=state)
             step += 1
-            if conv:
+            if self._quit_mode == 'c':
                 if step >= self._maximum_iteration:
                     raise OutOfRangeException('The iteration time has exceeded the maximum value')
                 else:
@@ -208,8 +223,7 @@ class Q:
         plt.plot(range(len(self.conv)), self.conv)
 
     def run(self):
-        if self._run:
-            self._run(self.choose_optimal_action)
+        self._run(self.choose_optimal_action)
 
     def convergence(self, delta_Q=None):
         Q_sum = delta_Q.sum().sum()
@@ -219,4 +233,9 @@ class Q:
         else:
             return False
 
+    def start(self, mode=True):
+        if mode:
+            return self.train()
+        else:
+            return self.run()
 

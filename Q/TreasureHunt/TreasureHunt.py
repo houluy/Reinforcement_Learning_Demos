@@ -12,33 +12,45 @@ from Q.Q.Q import Q
 
 dir_path = path.dirname(path.abspath(__file__))
 config = path.join(dir_path, 'treasure.yaml')
+Q_file = path.join(dir_path, 'TreasureQ.csv')
 
-# from colorline import cprint
+from colorline import cprint
 
-#oprint = functools.partial(cprint, color='b', bcolor='k', end='')
-#tprint = functools.partial(cprint, color='r', bcolor='k', end='')
+oprint = functools.partial(cprint, color='b', bcolor='k', end='')
+tprint = functools.partial(cprint, color='r', bcolor='k', end='')
 
-oprint = functools.partial(print, end='')
-tprint = functools.partial(print, end='')
+#oprint = functools.partial(print, end='')
+#tprint = functools.partial(print, end='')
 
 class TreasureHunt:
     def __init__(self, speed, size):
         self._size = size
         self._state_set = list(range(self._size))
         self._action_set = [-1, 1] # 0 stands for left, 1 stands for right
-        self._init_state = self._state_set[0]
-        self._end_state = self._state_set[-1]
-        self._instant_reward = 10
+        self._init_state_ind = 1#random.randint(1, self._size - 1)
+        self._init_state = self._state_set[self._init_state_ind]
+        self._end_state_ind = [0, -1]
+        self._win_state = self._state_set[-1]
+        self._lose_state = self._state_set[0]
+        self._win_reward = 1
+        self._lose_reward = -1
         self._warrior_pos = 0
         self._warrior_sign = 'o'
         self._treasure_pos = self._size - 1
         self._treasure_sign = 'T'
+        self._path_cost = -0.05
+        self._trap_pos = 0
+        self._trap_sign = 'X'
         self._path = '_'
         self._speed = speed # Display speed, lower faster
         self._left = -1
         self._right = 1
         self.custom_params = {
-            'show': None, #self.print_map,
+            'show': self.print_map,
+        }
+        self._end_dict = {
+            self._win_state: self._win_reward,
+            self._lose_state: self._lose_reward,
         }
 
     def init(self):
@@ -74,6 +86,8 @@ class TreasureHunt:
                 oprint(self._warrior_sign)
             elif i == self._treasure_pos:
                 tprint(self._treasure_sign)
+            elif i == self._trap_pos:
+                tprint(self._trap_sign)
             else:
                 print(self._path, end='')
         print()
@@ -82,8 +96,9 @@ class TreasureHunt:
         if state is None:
             state = self._warrior_pos
         next_state = self.move(state=state, direction=direction)
-        if next_state == self._treasure_pos:
-            return True
+        rew = self._end_dict.get(next_state, None)
+        if rew is not None:
+            return rew
         else:
             return False
 
@@ -116,29 +131,43 @@ class TreasureHunt:
             self.print_map()
             end = self.check_win()
 
+
 class Adaptor(TreasureHunt, Q):
-    def __init__(self, size=10, speed=0.5):
+    def __init__(self, size=10, speed=20, args=None):
         TreasureHunt.__init__(self, speed, size)
+        if args.train:
+            params = {
+                'load': args.load,
+                'display': args.show,
+                'heuristic': args.heuristic,
+                'quit_mode': args.mode,
+                'train_steps': args.round,
+            }
+        else:
+            params = {}
         Q.__init__(
             self,
             state_set=self._state_set,
             action_set=self._action_set,
+            start_at=self._init_state_ind,
+            end_at=self._end_state_ind,
             available_actions=self.available_actions,
             reward_func=self.reward,
             transition_func=self.transfer,
             run=self.play,
-            q_file='TreasureQ.csv',
-            load_q=False,
-            config_file=config,
-            display=False,
-            custom_params=self.custom_params
+            q_file='TreasureQ.csv',#Q_file,
+            config_file=config,#args.config_file,
+            custom_params=self.custom_params,
+            sleep_time=1/speed,
+            **params
         )
 
     def reward(self, state, action):
-        if super().check_win(state=state, direction=action):
-            return self._instant_reward
+        rew = super().check_win(state=state, direction=action)
+        if rew:
+            return rew
         else:
-            return 0
+            return self._path_cost
 
     def transfer(self, state, action):
         next_state = super().move(state=state, direction=action)
