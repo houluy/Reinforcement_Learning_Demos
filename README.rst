@@ -10,15 +10,21 @@ How to prepare
 Just run ``pip install -r requirements.txt`` to install the dependencies. Be careful with the Python version and global packages.
 
 - virtualenv
-If you're familiar with ``virtualenv``, then you can create the environment by::
+If you're familiar with ``virtualenv``, then you can create the environment by
+
+.. code-block:: shell
 
     virtualenv demo
 
-and activate the virtual environment::
+and activate the virtual environment
+
+.. code-block:: shell
 
     source bin/activate
 
-Finally, use ``pip`` to install the requirements::
+Finally, use ``pip`` to install the requirements
+
+.. code-block:: shell
 
     pip install -r requirements.txt
 
@@ -26,12 +32,16 @@ Of course, ``virtualenvwrapper`` is more pleasant.
 
 - pipenv(highly recommended)
 If you can use ``pipenv``, that's perfect.
-Use ``pipenv`` to create a working directory::
+Use ``pipenv`` to create a working directory
+
+.. code-block:: shell
 
     pipenv --python 3.6
 
 (Python 3.6 is great)
-and run::
+and run
+
+.. code-block:: shell
 
     pipenv install
 
