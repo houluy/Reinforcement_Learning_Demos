@@ -53,65 +53,132 @@ How to run
 
 - pip/virtualenv
 
-Run ``python3.6 find_treasure.py -h`` directly to see the help page.
+Run ``python3.6 main.py -h`` directly to see the help page.
 
 - pipenv
 
-Run ``pipenv run python3.6 find_treasure.py -h`` to see the help.
+Run ``pipenv run python3.6 main.py -h`` to see the help.
 
-**********
+-----------
 USAGE
-**********
+-----------
 
 ::
 
-    usage: find_treasure.py [-h] [-l] [-r ROUNDS] [-m {t,p}] [-s] [-c CONFIG_FILE]
+    usage: main.py [-h] {train,run} ...
 
     This is a demo to show how Q_learning makes agent intelligent
 
     optional arguments:
-        -h, --help          show this help message and exit
-        -l, --load          Load Q table from a csv file
-        -r ROUNDS, --rounds ROUNDS
-                            Training rounds
-        -m {t,p}, --mode {t,p}
-                            Mode: oneof ["t"(train), "p"(play)]
-        -s, --show          Show the training process.
-        -c CONFIG_FILE, --config_file CONFIG_FILE
+      -h, --help   show this help message and exit
+
+    mode:
+      {train,run}  Choose a mode
+        train      Train an agent
+        run        Make an agent run
+
+*************
+train
+*************
+
+Help for train subcommand
+
+:: 
+
+	usage: main.py train [-h] [-m {c,r}] [-r ROUND] [-l] [-s] [-c CONFIG_FILE]
+    			[-d {t}] [-a]
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -m {c,r}, --mode {c,r}
+                            Training mode, by rounds or by convergence
+      -r ROUND, --round ROUND
+                            Training rounds, neglect when convergence is chosen
+      -l, --load            Whether to load Q table from a csv file when training
+      -s, --show            Show the training process.
+      -c CONFIG_FILE, --config_file CONFIG_FILE
                             Config file for significant parameters
+      -d {t}, --demo {t}    Choose a demo to run
+      -a, --heuristic       Whether to use a heuristic iteration
 
-- l
-
-Load the Q table from a csv file. The file name can be modified in the program.
-
-- r
-
-Number of rounds to train the warrior. 
+Details:
 
 - m
 
-Mode. ``t`` stands for 'training', ``p`` stands for 'playing'.
+Mode of terminal when training. ``c`` stands for 'convergence', ``r`` stands for 'round'. If ``c`` is chosen, then the agent will stop only when the Q table is converged.  If ``r`` is chosen, the agent will only be trained for certain rounds(which can be modified by ``-r`` flag).
+
+- l
+
+Load the Q table from a csv file. The file name can be modified in the program. If not, a new Q table is built.
+
+- r
+
+Number of rounds to train the warrior. Will be ignored is ``-m c`` is chosen.
 
 - s
 
-If 'training' is selected, ``s`` flag can show the process of training.
+``s`` flag can show the process of training if been selected.
 
 - c
 
-A config file can be specified when training with this argument.
+A config filename can be specified when training with this argument.
 
-************
-CONFIG
-************
+- d
 
-Config file must be a YAML file containing the following parameters::
+Choose a demo to train.
+
+- a
+
+Whether to use the heuristic policy to accelerate the training progress.
+
+
+*************
+run
+*************
+
+Help for run subcommand
+
+::
+
+	usage: main.py run [-h] [-d {t}] [-q Q]
+
+    optional arguments:
+      -h, --help          show this help message and exit
+      -d {t}, --demo {t}  Choose a demo to run
+      -q Q                Choose a Q table from a csv file
+
+Details:
+
+- d
+
+Choose a demo to run.
+
+- q
+
+Specify a Q table file to use when run.
+
+-------------
+Demos
+-------------
+
+****************
+1-D TreasureHunt
+****************
+
+################
+Config file
+################
+
+Config file must be a YAML file containing the following parameters
+
+.. code-block:: yaml
 
   size: 10
   epsilon: 0.9
   gamma: 0.9
   alpha: 0.1
-  instant_reward: 1
   speed: 0.1
+
 
 - size
 
@@ -129,9 +196,6 @@ Discount factor.
 
 Learning rate.
 
-- instant_reward
-
-Reward for current state and action.
 
 - speed
 
@@ -141,19 +205,19 @@ Speed of displaying.
 DISPLAY
 *******************
 
-After 20 rounds of training::
+After convegence of training::
 
-    o_________T
-    _o________T
-    __o_______T
-    ___o______T
-    ____o_____T
-    _____o____T
-    ______o___T
-    _______o__T
-    ________o_T
-    _________oT
-    __________o
+   Xo_________T
+   X_o________T
+   X__o_______T
+   X___o______T
+   X____o_____T
+   X_____o____T
+   X______o___T
+   X_______o__T
+   X________o_T
+   X_________oT
+   X__________o
 
 The agent can find the treasure directly.
 
