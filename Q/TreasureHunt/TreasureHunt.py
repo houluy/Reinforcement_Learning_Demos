@@ -34,7 +34,7 @@ class TreasureHunt:
         self._lose_state = self._state_set[0]
         self._win_reward = 1
         self._lose_reward = -1
-        self._warrior_pos = 0
+        self._warrior_pos = self._init_state
         self._warrior_sign = 'o'
         self._treasure_pos = self._size - 1
         self._treasure_sign = 'T'
@@ -45,6 +45,7 @@ class TreasureHunt:
         self._speed = speed # Display speed, lower faster
         self._left = -1
         self._right = 1
+        self._actions = [self._left, self._right]
         self.custom_params = {
             'show': self.print_map,
         }
@@ -123,14 +124,13 @@ class TreasureHunt:
         end = False
         self.print_map()
         while not end:
-            move = np.random.randint(len(self._available_actions) + 1)
+            move = random.choice(self._actions)
+            end = self.check_win(direction=move)
             try:
                 self.move(move)
             except:
                 continue
             self.print_map()
-            end = self.check_win()
-
 
 class Adaptor(TreasureHunt, Q):
     def __init__(self, size=10, speed=20, args=None):
@@ -154,8 +154,8 @@ class Adaptor(TreasureHunt, Q):
             available_actions=self.available_actions,
             reward_func=self.reward,
             transition_func=self.transfer,
-            run=self.play,
-            q_file='TreasureQ.csv',#Q_file,
+            run=self.run,
+            q_file=Q_file,
             config_file=config,#args.config_file,
             custom_params=self.custom_params,
             sleep_time=1/speed,
@@ -174,18 +174,13 @@ class Adaptor(TreasureHunt, Q):
         return next_state
 
     def available_actions(self, state):
-        if state == self._state_set[0]:
-            return [self.right]
-        #elif state == self._state_set[-1]:
-        #    return [self.left]
-        else:
-            return self._action_set
+        return self._action_set
 
-    def play(self, choose_optimal_action):
+    def run(self, choose_optimal_action):
         state = self._init_state
         while True:
             action = choose_optimal_action(state=state)
-            next_state_ind, next_state = self.transfer(state=state, action=action)
+            next_state = self.transfer(state=state, action=action)
             self.print_map(state=state)
             if super().check_win(state=state, direction=action):
                 self.print_map(state=next_state)
