@@ -1,4 +1,5 @@
 import Q.TreasureHunt.TreasureHunt as TreasureHunt
+import Q.TreasureHunt2D.TreasureHunt2D as T2D
 
 import matplotlib.pyplot as plt
 import argparse
@@ -25,31 +26,27 @@ run_parser.add_argument('-d', '--demo', help='Choose a demo to run', choices=['t
 run_parser.add_argument('-q', help='Choose a Q table from a csv file', type=argparse.FileType('r'))
 
 
-def train(args):
-    args.train = True
+# def train(args):
+#     args.train = True
+# 
+# def run(args):
+#     args.train = False
+# 
+# train_parser.set_defaults(func=train)
+# run_parser.set_defaults(func=run)
+# 
+# args = parser.parse_args()
+# args.func(args)
+# try:
+#     th = TreasureHunt.Adaptor(args=args)
+#     th.start(mode=args.train)
+# except:
+#     type, value, tb = sys.exc_info()
+#     traceback.print_exc()
+#     pdb.post_mortem(tb)
 
-def run(args):
-    args.train = False
-
-train_parser.set_defaults(func=train)
-run_parser.set_defaults(func=run)
-
-args = parser.parse_args()
-args.func(args)
-try:
-    th = TreasureHunt.Adaptor(args=args)
-    th.start(mode=args.train)
-except:
-    type, value, tb = sys.exc_info()
-    traceback.print_exc()
-    pdb.post_mortem(tb)
-
-# print(train_args)
-
-#  try:
-#      th = TreasureHunt.Adaptor()
-#      th.train()
-#  except:
-#      type, value, tb = sys.exc_info()
-#      traceback.print_exc()
-#      pdb.post_mortem(tb)
+t = T2D.T2DAdaptor(10)
+t.display()
+m = t.available_moves()
+t.move(direction=m[0])
+t.display()
