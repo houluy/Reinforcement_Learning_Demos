@@ -85,7 +85,7 @@ Help for train subcommand
 
 :: 
 
-	usage: main.py train [-h] [-m {c,r}] [-r ROUND] [-l] [-s] [-c CONFIG_FILE]
+    usage: main.py train [-h] [-m {c,r}] [-r ROUND] [-l] [-s] [-c CONFIG_FILE]
     			[-d {t}] [-a]
 
     optional arguments:
@@ -140,7 +140,7 @@ Help for run subcommand
 
 ::
 
-	usage: main.py run [-h] [-d {t}] [-q Q]
+    usage: main.py run [-h] [-d {t}] [-q Q]
 
     optional arguments:
       -h, --help          show this help message and exit
