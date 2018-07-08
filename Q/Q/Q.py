@@ -26,6 +26,8 @@ class Q:
         transition_func,
         train_steps=300,
         run=None,
+        start_state=None,
+        end_states=None,
         start_at=0,
         end_at=[-1],
         config_file=None,
@@ -45,10 +47,14 @@ class Q:
     ):
         # Define state and action
         self._state_set = state_set
-        self._state_start_at = start_at
-        self._state_end_at = end_at
-        self._init_state = self._state_set[self._state_start_at]
-        self._end_state = [self._state_set[x] for x in self._state_end_at]
+        if start_state is None:
+            self._state_start_at = start_at
+            self._state_end_at = end_at
+            self._init_state = self._state_set[self._state_start_at]
+            self._end_state = [self._state_set[x] for x in self._state_end_at]
+        else:
+            self._init_state = start_state
+            self._end_state = end_states
         self._action_set = action_set
         self._available_actions = available_actions # Map between state and available actions
         self._run = run
@@ -141,24 +147,25 @@ class Q:
         if (len(available_actions) == 1):
             return available_actions[0]
         else:
-            all_Q = self._q_table.loc[state, :]
-            if (np.random.uniform() > self._epsilon) or (all_Q.all() == 0):
+            #pdb.set_trace()
+            all_Q = self._q_table.loc[[state], :]
+            if ((np.random.uniform() > self._epsilon) or all_Q.all().all()):
                 action = random.choice(available_actions)
                 #action_ind = np.where(self._action_set == action)[0][0] # Actions must be numpy array
             else:
-                action = all_Q.idxmax()
+                action = all_Q.idxmax(axis=1).values[0]
             return action
 
     def choose_optimal_action(self, state):
-        return self._q_table.loc[state, :].idxmax()
+        return self._q_table.loc[[state], :].idxmax()
 
     def choose_heuristic_action(self, state):
         available_actions = self._available_actions(state=state)
         if (len(available_actions) == 1):
             return available_actions[0]
         else:
-            all_Q = self._q_table.loc[state, :] + self._iota*self._H_table.loc[state, :]
-            if (np.random.uniform() > self._epsilon) or (all_Q.all() == 0):
+            all_Q = self._q_table.loc[[state], :] + self._iota*self._H_table.loc[[state], :]
+            if (np.random.uniform() > self._epsilon) or all_Q.all().all():
                 action = random.choice(available_actions)
                 #action_ind = np.where(self._action_set == action)[0][0] # Actions must be numpy array
             else:
@@ -186,17 +193,18 @@ class Q:
                     action = self.choose_action(state=state)
                 else:
                     action = self.choose_heuristic_action(state=state)
-                q_predict = self._q_table.loc[state, action]
+                #pdb.set_trace()
+                q_predict = self._q_table.loc[[state], [action]].values[0][0]
                 reward = self._reward_func(state=state, action=action)
                 next_state = self._transition_func(state=state, action=action)
                 if next_state in self._end_state:
                     q = reward
                     end = True
                 else:
-                    q = reward + self._gamma * self._q_table.loc[next_state, :].max()
-                self._H_table.loc[state, :] = 0
-                self._H_table.loc[state, action] = self._q_table.loc[state, :].max() - self._q_table.loc[state, action] + self._eta
-                self._q_table.loc[state, action] += self._alpha * (q - q_predict)
+                    q = reward + self._gamma * self._q_table.loc[[next_state], :].max().max()
+                self._H_table.loc[[state], :] = 0
+                self._H_table.loc[[state], [action]] = self._q_table.loc[[state], :].max().max() - self._q_table.loc[[state], [action]] + self._eta
+                self._q_table.loc[[state], [action]] += self._alpha * (q - q_predict)
                 state = next_state
                 self._display(state=state)
             step += 1

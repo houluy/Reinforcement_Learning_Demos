@@ -30,22 +30,14 @@ Finally, use ``pip`` to install the requirements
 
 Of course, ``virtualenvwrapper`` is more pleasant.
 
-- pipenv(highly recommended)
+- pipenv(*highly recommended*)
 If you can use ``pipenv``, that's perfect.
-Use ``pipenv`` to create a working directory
-
-.. code-block:: shell
-
-    pipenv --python 3.6
-
-(Python 3.6 is great)
-and run
 
 .. code-block:: shell
 
     pipenv install
 
-to install all the dependencies for this project
+to create the project and install all the dependencies for it. Make sure Python 3.6 is installed on your system.
 
 ------------------
 How to run

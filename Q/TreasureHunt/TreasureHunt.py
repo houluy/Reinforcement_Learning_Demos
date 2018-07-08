@@ -133,18 +133,8 @@ class TreasureHunt:
             self.print_map()
 
 class Adaptor(TreasureHunt, Q):
-    def __init__(self, size=10, speed=20, args=None):
+    def __init__(self, size=10, speed=20, params=None):
         TreasureHunt.__init__(self, speed, size)
-        if args.train:
-            params = {
-                'load': args.load,
-                'display': args.show,
-                'heuristic': args.heuristic,
-                'quit_mode': args.mode,
-                'train_steps': args.round,
-            }
-        else:
-            params = {}
         Q.__init__(
             self,
             state_set=self._state_set,
