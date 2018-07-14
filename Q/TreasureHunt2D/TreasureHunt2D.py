@@ -5,14 +5,17 @@ import pathlib
 df = pd.DataFrame
 from Q.Q.Q import Q
 import functools
+import time
 from itertools import product
 from collections import OrderedDict
 from pprint import pprint
+from math import sqrt
 import pdb
 
 file_path = pathlib.Path(__file__).parent
 config = file_path / 'TreasureHunt2D.yml'
 Q_file = file_path / 'Treasure2DQ.csv'
+conv_file = file_path / 'Treasure2Dconv.csv'
 mapfile = file_path / 'Treasure2Dmap.csv'
 
 from colorline import cprint
@@ -23,6 +26,7 @@ wprint = functools.partial(cprint, color='y', bcolor='k', end='')
 tprint = functools.partial(cprint, color='c', bcolor='k', end='')
 bprint = functools.partial(print, end='')
 eprint = functools.partial(cprint, color='g', bcolor='k', end='')
+hprint = functools.partial(cprint, color='p', bcolor='k', end='')
 
 def gen_randmap(size):
     randmap = df(
@@ -34,8 +38,8 @@ def gen_randmap(size):
     treasure_points = all_coors.pop()
     all_coors.pop(0)
     randmap.iat[treasure_points] = 2
-    wall_count = min(size) - 1
-    trap_count = wall_count - 1
+    wall_count = min(size) - 3
+    trap_count = wall_count + 1
     trap_points = []
     wall_points = []
     for x in range(wall_count + trap_count):
@@ -70,11 +74,11 @@ def rec_randmap(maps):
             pos = (r_ind, c_ind)
             coors.append(pos)
             c_dic.get(c_val).append(pos)
-    pprint(c_dic.values())
     return [maps.shape[0], coors, *c_dic.values()]
 
 def add_tuple(a, b):
     return tuple(sum(x) for x in zip(a, b))
+
 
 class TreasureHunt2D:
 
@@ -86,15 +90,17 @@ class TreasureHunt2D:
         return wrapper
        
     def __init__(self, mapfile=None, size=10, warrior_ch='@', dest_ch='#', trap_ch='X', wall_ch='-', blank_ch=' '):
-        if mapfile is None:
+        if (mapfile is None) or (not pathlib.Path(mapfile).exists()):
             self._size = size
             self._all_coors, self._maps, self._trap, self._wall, self._treasure, self._path = gen_randmap((self._size,)*2)
             self._warrior_pos = (0, 0) #random.choice(self._path)
             self._maps.iat[self._warrior_pos] = 3
+            self.save_map()
         else:
             self._maps = self.load_map(mapfile)
             self._size, self._all_coors, self._trap, self._path, self._wall, self._treasure, self._warrior_pos = rec_randmap(self._maps)
-            self._warrior_pos = self._warrior_pos[0]
+            self._treasure = self._treasure[0]
+            self._warrior_pos = (0, 0)
         self._terminal_points = self._trap + [self._treasure]
         self._warrior_ch = warrior_ch
         self._occupation = 0
@@ -113,23 +119,31 @@ class TreasureHunt2D:
         self._directions_str = ['↓', '→', '↑', '←']
         self._direction = dict(zip(self._all_dirs, self._directions_str))
 
-    def load_map(self, mapfile):
+    def load_map(self, mapfile=mapfile):
         self._maps = pd.read_csv(mapfile, index_col=0)
         self._maps.columns = self._maps.columns.astype(int)
         return self._maps
 
-    def save_map(self, mapfile):
+    def save_map(self, mapfile=mapfile):
         self._maps.to_csv(mapfile)
 
-    def display(self, state=None):
+    def test(self):
+        #pdb.set_trace()
+        self.display()
+        amoves = self.available_moves(pos=(0, 1))
+        print(amoves)
+
+    @check_pos
+    def display(self, pos=None):
         for x, row in self._maps.iterrows():
             print('|', end='')
             for y, col in row.iteritems():
-                if (x, y) in self._history_path:
-                    print_func = eprint
+                if (x, y) == pos:
+                    eprint(self._warrior_ch)
+                elif (x, y) in self._history_path:
+                    hprint(self._warrior_ch)
                 else:
-                    print_func = self._print_map.get(col)
-                print_func(self._char_map.get(col))
+                    self._print_map.get(col)(self._char_map.get(col))
                 print('|', end='')
             print()
         print()
@@ -162,7 +176,7 @@ class TreasureHunt2D:
         all_moves = self._all_dirs
         amoves = []
         for move in all_moves:
-            npos = add_tuple(self._warrior_pos, move)
+            npos = add_tuple(pos, move)
             if not (npos in self._wall or self.check_boundary(npos)):
                 amoves.append(move)
         return amoves
@@ -178,21 +192,25 @@ class TreasureHunt2D:
         self._history_path.append(pos)
         self._maps.iat[pos] = 0
         self._warrior_pos = self.move(direction=direction, pos=pos)
-        self._maps.iat[self._warrior_pos] = 3
+        #self._maps.iat[self._warrior_pos] = 3
         return self._warrior_pos
 
+    @check_pos
+    def Euclidean(self, pos):
+        return sqrt((pos[0] - self._treasure[0])**2 + (pos[1] - self._treasure[1])**2)
+
+    @check_pos
+    def Manhattan(self, pos):
+        return abs(pos[0] - self._treasure[0]) + abs(pos[1] - self._treasure[1])
 
 class Adaptor(TreasureHunt2D, Q):
-    def __init__(self, params=None, load_map=False, **kwargs):
-        if load_map:
-            kwargs['mapfile'] = mapfile
-        else:
-            kwargs['size'] = 10
+    def __init__(self, params=None, **kwargs):
+        kwargs['mapfile'] = mapfile
         TreasureHunt2D.__init__(self, **kwargs)
         self._state_space = self._all_coors
         self._action_space = self._all_dirs
         self._current_state = self._warrior_pos
-        self._defaultrewards = [-10, -2, None, 10, None]
+        self._defaultrewards = [-10, 0, None, 10, None]
         self._reward_dic = dict(zip(self._points, self._defaultrewards))
         self._custom = {
             'show': self.display,
@@ -203,19 +221,30 @@ class Adaptor(TreasureHunt2D, Q):
             action_set=self._action_space,
             start_state=self._warrior_pos,
             end_states=self._terminal_points,
+            init=self.init,
+            ahook=self.save_map,
             available_actions=self.available_actions,
             reward_func=self.reward,
             transition_func=self.transfer,
             config_file=config,
             q_file=Q_file,
+            conv_file=conv_file,
             run=self.run,
             sleep_time=1/10,
             custom_params=self._custom,
             **params
         )
+        self.run_sleep = 0.5
 
     def reward(self, state, action):
-        return self._reward_dic.get(self[self.move(direction=action, pos=state)])
+        dist_bef = self.Manhattan(pos=state)
+        npos = self.move(direction=action, pos=state)
+        dist_aft = self.Manhattan(pos=npos)
+        ir = self._reward_dic.get(self[npos])
+        if (ir == 10) or (ir == -10):
+            return ir
+        else:
+            return ir + 0.1*(dist_bef - dist_aft)
 
     def transfer(self, state, action):
         self._current_state = self.update_map(direction=action, pos=state)
@@ -224,20 +253,23 @@ class Adaptor(TreasureHunt2D, Q):
     def available_actions(self, state):
         return self.available_moves(pos=state)
 
-    def test(self):
-        #pdb.set_trace()
-        amoves = self.available_moves()
-        for m in amoves:
-            #pdb.set_trace()
-            print(self.reward(self._current_state, m))
+    def display(self, state):
+        super().display(pos=state)
+
+    def init(self):
+        self._warrior_pos = (0, 0)
+        self._history_path = []
 
     def run(self, choose_optimal_action):
+        #pdb.set_trace()
         state = self._warrior_pos
+        super().display()
         while True:
+            time.sleep(self.run_sleep)
             action = choose_optimal_action(state=state)
             nstate = self.transfer(state=state, action=action)
             self.update_map(direction=action, pos=state)
-            self.display()
+            super().display()
             winning = self.check_win()
             if winning is None:
                 state = nstate
@@ -246,20 +278,7 @@ class Adaptor(TreasureHunt2D, Q):
                     print('Finds!')
                 else:
                     print('Dies!')
-        #if args.train:
-        #    params = {
-        #        'load': args.load,
-        #        'display': args.show,
-        #        'heuristic': args.heuristic,
-        #        'quit_mode': args.mode,
-        #        'train_steps': args.round,
-        #    }
-        #else:
-        #    params = {}
-        #Q.__init__(
-        #    self,
-
-
+                break
 
 if __name__ == '__main__':
     th2d = TreasureHunt2D(10)

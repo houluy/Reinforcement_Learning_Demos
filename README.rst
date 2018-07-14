@@ -188,7 +188,6 @@ Discount factor.
 
 Learning rate.
 
-
 - speed
 
 Speed of displaying.
@@ -218,6 +217,24 @@ The agent can find the treasure directly.
 *******************
 
 ###################
+Train the agent
+###################
+
+.. code-block:: shell
+   pipenv run python main.py train -d 2d -s -m c
+
+Enjoy the training process.
+
+###################
+Run
+###################
+
+.. code-block:: shell
+   pipenv run python main.py run -d 2d
+
+Watch the result.
+
+###################
 DISPLAY
 ###################
 
@@ -234,8 +251,3 @@ DISPLAY
 | | |+| | | | | | | |
 | | | | |+| | | |X|#|
 
--------------------
-Thanks
--------------------
-
-`莫烦PYTHON <https://morvanzhou.github.io/tutorials/machine-learning/reinforcement-learning/2-1-general-rl/>`_

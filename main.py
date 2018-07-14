@@ -46,7 +46,9 @@ if args.train:
         'train_steps': args.round,
     }
 else:
-    params = {}
+    params = {
+        'load': True,         
+    }
 
 game_dic = {
     '1d': TreasureHunt,

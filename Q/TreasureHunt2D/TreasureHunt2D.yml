@@ -1,5 +1,6 @@
+size: 10
 epsilon: 0.9
 gamma: 0.9
 alpha: 0.1
-phi: 0.000001
+phi: 0.00001
 speed: 0.1
