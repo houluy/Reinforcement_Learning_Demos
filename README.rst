@@ -221,6 +221,7 @@ Train the agent
 ###################
 
 .. code-block:: shell
+
    pipenv run python main.py train -d 2d -s -m c
 
 Enjoy the training process.
@@ -230,6 +231,7 @@ Run
 ###################
 
 .. code-block:: shell
+
    pipenv run python main.py run -d 2d
 
 Watch the result.
