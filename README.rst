@@ -92,6 +92,8 @@ Help for train subcommand
                             Config file for significant parameters
       -d {t}, --demo {t}    Choose a demo to run
       -a, --heuristic       Whether to use a heuristic iteration
+      -g {Q,SARSA}, --algorithm {Q,SARSA}                        
+                            Training algorithm: Q or SARSA, default is Q
 
 Details:
 
@@ -122,6 +124,10 @@ Choose a demo to train.
 - a
 
 Whether to use the heuristic policy to accelerate the training progress.
+
+- g
+
+Choose an algorithm from {Q, SARSA}
 
 
 *************
@@ -222,7 +228,7 @@ Train the agent
 
 .. code-block:: shell
 
-   pipenv run python main.py train -d 2d -s -m c
+   pipenv run python main.py train -d 2d -s 
 
 Enjoy the training process.
 

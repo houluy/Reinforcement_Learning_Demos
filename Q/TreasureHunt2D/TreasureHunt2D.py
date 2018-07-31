@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import random
 import pathlib
+import yaml
 df = pd.DataFrame
 from Q.Q.Q import Q
 import functools
@@ -13,7 +14,7 @@ from math import sqrt
 import pdb
 
 file_path = pathlib.Path(__file__).parent
-config = file_path / 'TreasureHunt2D.yml'
+config_file = file_path / 'TreasureHunt2D.yml'
 Q_file = file_path / 'Treasure2DQ.csv'
 conv_file = file_path / 'Treasure2Dconv.csv'
 mapfile = file_path / 'Treasure2Dmap.csv'
@@ -28,59 +29,61 @@ bprint = functools.partial(print, end='')
 eprint = functools.partial(cprint, color='g', bcolor='k', end='')
 hprint = functools.partial(cprint, color='p', bcolor='k', end='')
 
-def gen_randmap(size):
-    randmap = df(
-        np.zeros(size),
-        dtype=np.int8
-    )
-    all_coors = [(x, y) for x, y in product(range(size[0]), range(size[1]))]
-    cp_allcs = all_coors[:]
-    treasure_points = all_coors.pop()
-    all_coors.pop(0)
-    randmap.iat[treasure_points] = 2
-    wall_count = min(size) - 3
-    trap_count = wall_count + 1
-    trap_points = []
-    wall_points = []
-    for x in range(wall_count + trap_count):
-        coor = random.choice(all_coors)
-        if x < wall_count:
-            wall_points.append(coor)
-            randmap.iat[coor] = 1
-        else:
-            trap_points.append(coor)
-            randmap.iat[coor] = -1
-
-    return (
-        cp_allcs,
-        randmap,
-        trap_points,
-        wall_points,
-        treasure_points,
-        all_coors,
-    )
-
-def rec_randmap(maps):
-    coors, trap, wall, treasure, path, warrior = [[] for _ in range(6)]
-    c_dic = OrderedDict({
-        -1: trap,
-        0: path,
-        1: wall,
-        2: treasure,
-        3: warrior,
-    })
-    for r_ind, r_val in maps.iterrows():
-        for c_ind, c_val in r_val.iteritems():
-            pos = (r_ind, c_ind)
-            coors.append(pos)
-            c_dic.get(c_val).append(pos)
-    return [maps.shape[0], coors, *c_dic.values()]
 
 def add_tuple(a, b):
     return tuple(sum(x) for x in zip(a, b))
 
 
 class TreasureHunt2D:
+    @staticmethod
+    def gen_randmap(size):
+        randmap = df(
+            np.zeros(size),
+            dtype=np.int8
+        )
+        all_coors = [(x, y) for x, y in product(range(size[0]), range(size[1]))]
+        cp_allcs = all_coors[:]
+        treasure_points = all_coors.pop()
+        all_coors.pop(0)
+        randmap.iat[treasure_points] = 2
+        wall_count = min(size) - 3
+        trap_count = wall_count + 1
+        trap_points = []
+        wall_points = []
+        for x in range(wall_count + trap_count):
+            coor = random.choice(all_coors)
+            if x < wall_count:
+                wall_points.append(coor)
+                randmap.iat[coor] = 1
+            else:
+                trap_points.append(coor)
+                randmap.iat[coor] = -1
+
+        return (
+            cp_allcs,
+            randmap,
+            trap_points,
+            wall_points,
+            treasure_points,
+            all_coors,
+        )
+
+    @staticmethod
+    def rec_randmap(maps):
+        coors, trap, wall, treasure, path, warrior = [[] for _ in range(6)]
+        c_dic = OrderedDict({
+            -1: trap,
+            0: path,
+            1: wall,
+            2: treasure,
+            3: warrior,
+        })
+        for r_ind, r_val in maps.iterrows():
+            for c_ind, c_val in r_val.iteritems():
+                pos = (r_ind, c_ind)
+                coors.append(pos)
+                c_dic.get(c_val).append(pos)
+        return [maps.shape[0], coors, *c_dic.values()]
 
     def check_pos(func):
         def wrapper(self, pos=None, *args, **kwargs):
@@ -92,13 +95,13 @@ class TreasureHunt2D:
     def __init__(self, mapfile=None, size=10, warrior_ch='@', dest_ch='#', trap_ch='X', wall_ch='-', blank_ch=' '):
         if (mapfile is None) or (not pathlib.Path(mapfile).exists()):
             self._size = size
-            self._all_coors, self._maps, self._trap, self._wall, self._treasure, self._path = gen_randmap((self._size,)*2)
+            self._all_coors, self._maps, self._trap, self._wall, self._treasure, self._path = self.gen_randmap((self._size,)*2)
             self._warrior_pos = (0, 0) #random.choice(self._path)
             self._maps.iat[self._warrior_pos] = 3
             self.save_map()
         else:
             self._maps = self.load_map(mapfile)
-            self._size, self._all_coors, self._trap, self._path, self._wall, self._treasure, self._warrior_pos = rec_randmap(self._maps)
+            self._size, self._all_coors, self._trap, self._path, self._wall, self._treasure, self._warrior_pos = self.rec_randmap(self._maps)
             self._treasure = self._treasure[0]
             self._warrior_pos = (0, 0)
         self._terminal_points = self._trap + [self._treasure]
@@ -206,37 +209,46 @@ class TreasureHunt2D:
 class Adaptor(TreasureHunt2D, Q):
     def __init__(self, params=None, **kwargs):
         kwargs['mapfile'] = mapfile
+        config = yaml.load(open(config_file))
+        config2D = config.get('2D')
+        kwargs['size'] = config2D.get('size')
+        speed = config2D.get('speed')
         TreasureHunt2D.__init__(self, **kwargs)
         self._state_space = self._all_coors
         self._action_space = self._all_dirs
         self._current_state = self._warrior_pos
-        self._defaultrewards = [-10, 0, None, 10, None]
+        self._defaultrewards = [-10, -1, None, 10, None]
         self._reward_dic = dict(zip(self._points, self._defaultrewards))
         self._custom = {
             'show': self.display,
         }
+        Q_params = config.get('Q')
         Q.__init__(
             self,
             state_set=self._state_space,
             action_set=self._action_space,
-            start_state=self._warrior_pos,
+            start_states=[(0, 0)],#self._path,
             end_states=self._terminal_points,
             init=self.init,
             ahook=self.save_map,
             available_actions=self.available_actions,
             reward_func=self.reward,
             transition_func=self.transfer,
-            config_file=config,
             q_file=Q_file,
             conv_file=conv_file,
             run=self.run,
-            sleep_time=1/10,
+            sleep_time=speed,
             custom_params=self._custom,
-            **params
+            **params,
+            **Q_params
         )
-        self.run_sleep = 0.5
+        self.run_sleep = 0.1
 
     def reward(self, state, action):
+        npos = self.move(direction=action, pos=state)
+        return self._reward_dic.get(self[npos])
+
+    def heuristic_reward(self, state, action):
         dist_bef = self.Manhattan(pos=state)
         npos = self.move(direction=action, pos=state)
         dist_aft = self.Manhattan(pos=npos)
