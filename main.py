@@ -24,7 +24,7 @@ train_parser.add_argument('-s', '--show', help='Show the training process.', act
 train_parser.add_argument('-c', '--config_file', help='Config file for significant parameters', default=None)
 train_parser.add_argument('-d', '--demo', help='Choose a demo to run', choices=['1d', '2d'], default='2d')
 train_parser.add_argument('-a', '--heuristic', help='Whether to use a heuristic iteration', action='store_true', default=False)
-train_parser.add_argument('-g', '--algorithm', help='Training algorithm: Q or SARSA, default is Q', choices=['Q', 'SARSA'], default='Q')
+train_parser.add_argument('-g', '--algorithm', help='Training algorithm: Q, SARSA and Double Q, default is Q', choices=['Q', 'SARSA', 'DoubleQ'], default='Q')
 
 # Arguments for running
 run_parser.add_argument('-d', '--demo', help='Choose a demo to run', choices=['1d', '2d'], default='2d')
@@ -68,53 +68,4 @@ except:
     type, value, tb = sys.exc_info()
     traceback.print_exc()
     pdb.post_mortem(tb)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

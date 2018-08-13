@@ -127,7 +127,7 @@ Whether to use the heuristic policy to accelerate the training progress.
 
 - g
 
-Choose an algorithm from {Q, SARSA}
+Choose an algorithm from {Q, SARSA, DoubleQ}
 
 
 *************

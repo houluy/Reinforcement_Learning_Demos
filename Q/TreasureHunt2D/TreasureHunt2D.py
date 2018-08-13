@@ -217,7 +217,7 @@ class Adaptor(TreasureHunt2D, Q):
         self._state_space = self._all_coors
         self._action_space = self._all_dirs
         self._current_state = self._warrior_pos
-        self._defaultrewards = [-10, -1, None, 10, None]
+        self._defaultrewards = [-10, -0.5, None, 10, None]
         self._reward_dic = dict(zip(self._points, self._defaultrewards))
         self._custom = {
             'show': self.display,

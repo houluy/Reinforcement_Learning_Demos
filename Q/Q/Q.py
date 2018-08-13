@@ -100,6 +100,7 @@ class Q:
         else:
             self._q_table = self.build_q_table()
 
+        
         # Config all the necessary parameters
         if config_file:
             config = yaml.load(open(config_file))
@@ -118,10 +119,19 @@ class Q:
         self.train_dict = {
             'Q': self.Q_train,
             'SARSA': self.SARSA_train,
+            'DoubleQ': self.DoubleQ_train,
         }
         self.train_algorithm = algorithm
-
+        if self.train_algorithm == 'DoubleQ':
+            self._qb_table = self._q_table.copy()
         self.train = self.train_dict.get(self.train_algorithm)
+
+    def Q_wrapper(f):
+        def func(self, Q_table=None, *args, **kwargs):
+            if Q_table is None:
+                Q_table = self._q_table
+            return f(self, Q_table=Q_table, *args, **kwargs)
+        return func
 
     def _load_config(self, config):
         seq = ['epsilon', 'gamma', 'alpha', 'phi']
@@ -135,8 +145,9 @@ class Q:
         self._q_table.index = self._state_set
         return self._q_table
 
-    def save_q(self):
-        self._q_table.to_csv(self._q_file, index=False, header=False)
+    @Q_wrapper
+    def save_q(self, Q_table):
+        Q_table.to_csv(self._q_file, index=False, header=False)
 
     def _save_conv(self):
         np.savetxt(self._conv_file, self.conv)
@@ -144,21 +155,22 @@ class Q:
     def _save_reward(self):
         return np.array(self.reward_per_episode).mean()
 
-    def _display(self, sleep=True, state=None):
+    def _display(self, state=None, sleep=True):
         if self._display_flag:
             if self._custom_show:
                 self._custom_show(state=state)
                 if sleep:
                     time.sleep(self._sleep_time)
 
-    def _display_train_info(self, train_round):
+    @Q_wrapper
+    def _display_train_info(self, train_round, Q_table=None):
         if len(self.conv) > 2:
             conv = self.conv[train_round - 1] - self.conv[train_round - 2]
         else:
             conv = 0
         print('train_round: {}, Convergence: {}'.format(train_round, conv))
         #print('Convergence: {}'.format(self.conv[-1] - self.conv[-2] if len(self.conv) > 1 else self.conv[-1]))
-        print('Q table: {}'.format(self._q_table))
+        #print('Q table: {}'.format(Q_table))
 
     def build_q_table(self):
         index = self._state_set
@@ -188,30 +200,30 @@ class Q:
     def epsilon_linear(self, itertime):
         return 1/(itertime*10 + 1)
 
-    def choose_action(self, state, itertime):
+    @Q_wrapper
+    def choose_action(self, state, itertime, Q_table=None):
         available_actions = self._available_actions(state=state)
         if (len(available_actions) == 1):
             return available_actions[0]
         else:
-            all_Q = self._q_table.loc[[state], available_actions]
             if (np.random.uniform() < self.epsilon_linear(itertime)):
                 action = random.choice(available_actions)
-                #action_ind = np.where(self._action_set == action)[0][0] # Actions must be numpy array
             else:
-                mval = all_Q.max().max()
-                maxQ_actions = all_Q[all_Q == mval].dropna(axis=1).columns
-                #print('Max actions:{}'.format(maxQ_actions))
-                action = np.random.choice(maxQ_actions)
-                #if maxQ_actions.size == 1:
-                #    action = maxQ_actions.columns.values[0]
-                #else:
-                #    count = self.move_count.loc[[state], maxQ_actions]
-                #    unvis_actions = count[count == 0].dropna(axis=1).columns
-                #    action = np.random.choice(unvis_actions)
+                action = self.argmax(Q_table, state, available_actions)
             return action
 
     def choose_optimal_action(self, state):
-        return self._q_table.loc[[state], :].idxmax(axis=1).values[0]
+        return self.argmax(self._q_table, state=state, available=self._available_actions(state=state))
+
+    @staticmethod
+    def argmax(Q_table, state, available=None):
+        if available:
+            all_Q = Q_table.loc[[state], available]
+        else:
+            all_Q = Q_table.loc[[state], :]
+        mval = all_Q.max().max()
+        allmaxactions = all_Q[all_Q == mval].dropna(axis=1).columns
+        return np.random.choice(allmaxactions)
 
     def choose_heuristic_action(self, state):
         available_actions = self._available_actions(state=state)
@@ -221,7 +233,6 @@ class Q:
             all_Q = self._q_table.loc[[state], :] + self._iota*self._H_table.loc[[state], :]
             if (np.random.uniform() > self._epsilon) or all_Q.all().all():
                 action = random.choice(available_actions)
-                #action_ind = np.where(self._action_set == action)[0][0] # Actions must be numpy array
             else:
                 action = all_Q.idxmax()
             return action
@@ -231,7 +242,6 @@ class Q:
         train_round = 1
         stop = False
         init_Q = self._q_table.copy()
-        self.Q_sum = np.array([0, 0])
         self.conv = np.array([0])
         while not stop:
             self._init()
@@ -239,7 +249,7 @@ class Q:
             #self._init_state = state
             end = False
             step = 1
-            self._display(sleep=False)
+            self._display()
             while not end:
                 #pdb.set_trace()
                 self._display_train_info(train_round=train_round)
@@ -263,7 +273,7 @@ class Q:
                 if step >= self._maximum_iteration:
                     raise OutOfRangeException('The iteration time has exceeded the maximum value')
                 else:
-                    stop = self.convergence(self._q_table.subtract(init_Q))
+                    stop = self.convergence()
             else:
                 #self.convergence(self._q_table.subtract(init_Q))
                 self.conv = np.append(self.conv, self._q_table.sum().sum())
@@ -280,7 +290,6 @@ class Q:
         stop = False
         self._H_table = self.build_q_table() # Heurisitc algorithm
         init_Q = self._q_table.copy()
-        self.Q_sum = np.array([0, 0])
         self.conv = np.array([0])
         self.reward_per_episode = []
         #pdb.set_trace()
@@ -290,7 +299,7 @@ class Q:
             state = random.choice(self._init_state)
             #self._init_state = state
             self._display_train_info(train_round=train_round)
-            self._display(sleep=False, state=state)
+            self._display(state=state)
             end = False
             step = 1
             current_reward = 0
@@ -329,7 +338,7 @@ class Q:
                 if step >= self._maximum_iteration:
                     raise OutOfRangeException('The iteration time has exceeded the maximum value')
                 else:
-                    stop = self.convergence(self._q_table.subtract(init_Q))
+                    stop = self.convergence()
             else:
                 #self.convergence(self._q_table.subtract(init_Q))
                 self.conv = np.append(self.conv, self._q_table.sum().sum())
@@ -339,6 +348,64 @@ class Q:
         if self.ahook:
             self.ahook()
         return self.conv
+
+    def DoubleQ_train(self):
+        total_round = self._train_round
+        train_round = 1
+        trainb_round = 1
+        astep = 1
+        bstep = 1
+        stop = False
+        self.conv = np.array([0])
+        while not stop:
+            self._init()
+            state = random.choice(self._init_state)
+            self._display(state=state)
+            end = False
+            while not end:
+                Q_average = (self._q_table + self._qb_table)/2
+                action = self.choose_action(state=state, itertime=train_round, Q_table=Q_average)
+                reward = self._reward_func(state=state, action=action)
+                next_state = self._transition_func(state=state, action=action)
+                # Here is the Double Q process
+                e = np.random.rand()
+                if e < 0.5:
+                    update_Q, estimate_Q = self._q_table, self._qb_table
+                    astep += 1
+                    com_step = astep
+                    #train_round += 1
+                    #tr = train_round
+                else:
+                    update_Q, estimate_Q = self._qb_table, self._q_table
+                    bstep += 1
+                    com_step = bstep
+                    #trainb_round += 1
+                    #tr = trainb_round
+                q_predict = update_Q.loc[[state], [action]].values[0][0]
+                max_action = self.argmax(update_Q, state=next_state)
+                if next_state in self._end_state:
+                    q = reward
+                    end = True
+                else:
+                    q = reward + self._gamma * estimate_Q.loc[[next_state], [max_action]].values[0][0]
+                update_Q.loc[[state], [action]] += 0.1 * (q - q_predict)#self.alpha_log(train_round) * (q - q_predict)
+                state = next_state
+                self._display(state=state)
+            train_round += 1
+
+            Q_average = (self._q_table + self._qb_table)/2
+            if self._quit_mode == 'c':
+                if train_round >= self._maximum_iteration:
+                    raise OutOfRangeException('The iteration time has exceeded the maximum value')
+                else:
+                    stop = self.convergence()
+            else:
+                self.conv = np.append(self.conv, Q_average.sum().sum())
+                stop = (train_round == total_round)
+            self.save_q(Q_table=Q_average)
+            self._save_conv()
+        return self.conv
+
 
     def plot_conv(self):
         plt.figure()
@@ -367,17 +434,13 @@ class Q:
                 reward2 += r
             ar /= 4
             reward += ar
-        return reward/self._dimension[0], reward2#self._q_table.sum().sum()/(self._dimension[0]*self._dimension[1])
+        return reward/self._dimension[0], reward2
 
     def run(self):
         self._run(self.choose_optimal_action)
 
-    def convergence(self, delta_Q=None):
-        Q_sum = delta_Q.sum().sum()
-        self.Q_sum = np.append(self.Q_sum, Q_sum)
-        self.conv = np.append(self.conv, Q_sum - self.Q_sum[-2])
-        if self.conv.size > 2 and 0 <= self.conv[-1] < self._phi:
-            #print('Conv:{}'.format(Q_sum - self.conv[-2]))
+    def convergence(self):
+        if self.conv.size > 2 and 0 <= self.conv[-1] - self.conv[-2] < self._phi:
             return True
         else:
             return False

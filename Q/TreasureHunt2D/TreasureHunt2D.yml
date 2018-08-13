@@ -1,5 +1,5 @@
 2D:
-    size: 3
+    size: 4
     speed: 0.1
 Q:
     epsilon: 0.9
