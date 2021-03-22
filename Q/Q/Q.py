@@ -27,8 +27,7 @@ class Q:
         state_set,
         action_set,
         available_actions,
-        reward_func,
-        transition_func,
+        env,
         init,
         ahook=None,
         train_round=300,
@@ -86,12 +85,8 @@ class Q:
         self._eta = eta
         self._iota = iota
 
-        # Reward function
-        self._reward_func = reward_func
-
-        # State transition function
-        self._transition_func = transition_func
-
+        self.env = env
+        
         # Generate Q table
         if load:
             if not self._q_file.is_file():
@@ -120,10 +115,13 @@ class Q:
             'Q': self.Q_train,
             'SARSA': self.SARSA_train,
             'DoubleQ': self.DoubleQ_train,
+            "SARSA_lambda": self.SARSA_lambda_train,
         }
         self.train_algorithm = algorithm
         if self.train_algorithm == 'DoubleQ':
             self._qb_table = self._q_table.copy()
+        elif self.train_algorithm == "SARSA_lambda":
+            self._eligibility_trace = self._q_table.copy()
         self.train = self.train_dict.get(self.train_algorithm)
 
     def Q_wrapper(f):
@@ -244,28 +242,25 @@ class Q:
         init_Q = self._q_table.copy()
         self.conv = np.array([0])
         while not stop:
-            self._init()
-            state = random.choice(self._init_state)
-            #self._init_state = state
-            end = False
+            self.env.reset()
+            state = self.env.observation
+            action = self.choose_action(state=state, itertime=train_round)
+            done = False
             step = 1
             self._display()
-            while not end:
-                #pdb.set_trace()
+            while not done:
                 self._display_train_info(train_round=train_round)
-                action = self.choose_action(state=state, itertime=train_round)
                 q_predict = self._q_table.loc[[state], [action]].values[0][0]
-                reward = self._reward_func(state=state, action=action)
-                next_state = self._transition_func(state=state, action=action)
-                if next_state in self._end_state:
+                reward, next_state, done, info = self.env.step(action)
+                if done:
                     q = reward
-                    end = True
                 else:
                     # Here is the critical difference
                     next_action = self.choose_action(state=next_state, itertime=train_round)
                     q = reward + self._gamma * self._q_table.loc[[next_state], [next_action]].values[0][0]
                 self._q_table.loc[[state], [action]] += self.alpha_log(train_round) * (q - q_predict) 
                 state = next_state
+                action = next_action
                 self._display(state=state)
                 step += 1
             train_round += 1
@@ -278,13 +273,35 @@ class Q:
                 #self.convergence(self._q_table.subtract(init_Q))
                 self.conv = np.append(self.conv, self._q_table.sum().sum())
                 stop = (train_round == total_round)
-
             self.save_q()
             self._save_conv()
 
+    def SARSA_lambda_train(self):
+        total_episode = self._train_round
+        episode = 1
+        stop = False
+        while not stop:
+            self.env.reset()
+            state = self.env.observation
+            action = self.choose_action(state=state, itertime=episode)
+            self._display_train_info(train_round=train_round)
+            self._display(state=state)
+            done = False
+            step = 1
+            current_reward = 0
+            while not done:
+                q_predict = self._q_table.loc[[state], [action]].values[0][0]
+                reward, next_state, done, info = self.env.step(action)
+                current_reward += reward
+                self._eligibility_trace.loc[[state], [action]] += 1
+                next_action = self.choose_action(state=next_state, itertime=episode)
+                # TD error
+                delta = reward + self._gamma * self._q_table.loc[[next_state], [next_action]] - q_predict
+                # Iterate all state and action and update the Q value
+                for 
+
 
     def Q_train(self):
-        #pdb.set_trace()
         total_round = self._train_round
         train_round = 1
         stop = False
@@ -292,39 +309,29 @@ class Q:
         init_Q = self._q_table.copy()
         self.conv = np.array([0])
         self.reward_per_episode = []
-        #pdb.set_trace()
         while not stop:
-            self._init()
+            self.env.reset()
+            state = self.env.observation
             self.move_count = self.build_q_table()
-            state = random.choice(self._init_state)
-            #self._init_state = state
             self._display_train_info(train_round=train_round)
             self._display(state=state)
-            end = False
+            done = False
             step = 1
             current_reward = 0
-            while not end:
-                #pdb.set_trace()
+            while not done:
                 self._display_train_info(train_round=train_round)
                 if not self._heuristic:
                     action = self.choose_action(state=state, itertime=train_round)
                 else:
                     action = self.choose_heuristic_action(state=state, train_round=train_round)
                 q_predict = self._q_table.loc[[state], [action]].values[0][0]
-                reward = self._reward_func(state=state, action=action)
+                reward, next_state, done, info = self.env.step(action)
                 current_reward += reward
-                next_state = self._transition_func(state=state, action=action)
                 self.move_count.loc[[state], [action]] += 1
-                if self.step_end:
-                    if step == self.ending_step - 1:
-                        q = reward
-                        end = True
-                        self.reward_per_episode.append(current_reward)
-                    else:
-                        q = reward + self._gamma * self._q_table.loc[[next_state], :].max().max()
-                elif (next_state in self._end_state):
+                if done:
                     q = reward
                     end = True
+                    self.reward_per_episode.append(current_reward)
                 else:
                     q = reward + self._gamma * self._q_table.loc[[next_state], :].max().max()
                 self._H_table.loc[[state], :] = 0

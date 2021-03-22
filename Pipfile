@@ -1,9 +1,8 @@
 [[source]]
-url = "https://pypi.python.org/simple"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
 verify_ssl = true
 
 [packages]
-
 pandas = "==0.22.0"
 python-dateutil = "==2.7.2"
 colorline = "==1.0.3"
@@ -11,7 +10,7 @@ pytz = "==2018.3"
 pyyaml = "==3.12"
 numpy = "==1.14.2"
 matplotlib = "*"
-
+tensorflow = "*"
 
 [requires]
 python_version = "3.6"
