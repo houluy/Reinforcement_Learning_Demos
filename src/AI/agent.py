@@ -21,7 +21,7 @@ class OutOfRangeException(Exception):
 class QFileNotFoundError(OSError):
     pass
 
-class Q:
+class Agent:
     def __init__(
         self,
         state_set,
@@ -298,7 +298,7 @@ class Q:
                 # TD error
                 delta = reward + self._gamma * self._q_table.loc[[next_state], [next_action]] - q_predict
                 # Iterate all state and action and update the Q value
-                for 
+                #for 
 
 
     def Q_train(self):

@@ -4,7 +4,7 @@ import random
 import pathlib
 import yaml
 df = pd.DataFrame
-from Q.Q.Q import Q
+from src.AI.agent import Agent
 import functools
 import time
 from itertools import product
@@ -121,6 +121,8 @@ class TreasureHunt2D:
         self._all_dirs = [(0, 1), (1, 0), (0, -1), (-1, 0)]
         self._directions_str = ['↓', '→', '↑', '←']
         self._direction = dict(zip(self._all_dirs, self._directions_str))
+        self._defaultrewards = [-10, -0.5, None, 10, None]
+        self._reward_dic = dict(zip(self._points, self._defaultrewards))
 
     def load_map(self, mapfile=mapfile):
         self._maps = pd.read_csv(mapfile, index_col=0)
@@ -132,12 +134,12 @@ class TreasureHunt2D:
 
     def test(self):
         #pdb.set_trace()
-        self.display()
+        self.render()
         amoves = self.available_moves(pos=(0, 1))
         print(amoves)
 
     @check_pos
-    def display(self, pos=None):
+    def render(self, pos=None):
         for x, row in self._maps.iterrows():
             print('|', end='')
             for y, col in row.iteritems():
@@ -195,7 +197,24 @@ class TreasureHunt2D:
         self._history_path.append(pos)
         self._maps.iat[pos] = 0
         self._warrior_pos = self.move(direction=direction, pos=pos)
-        #self._maps.iat[self._warrior_pos] = 3
+        return self._warrior_pos
+
+    @property
+    def observation(self):
+        return self._warrior_pos
+
+    def step(self, action):
+        self._history_path.append(self._warrior_pos)
+        self._warrior_pos = self.move(direction=action)
+        reward = self._reward_dic[self._maps.iat(self._warrior_pos)]
+        done = Falsee
+        if self._warrior_pos in self._terminal_points:
+            done = True
+        return reward, self._warrior_pos, done, {}
+
+    def reset(self):
+        self._warrior_pos = (0, 0)
+        self._history_path.clear()
         return self._warrior_pos
 
     @check_pos
@@ -206,7 +225,8 @@ class TreasureHunt2D:
     def Manhattan(self, pos):
         return abs(pos[0] - self._treasure[0]) + abs(pos[1] - self._treasure[1])
 
-class Adaptor(TreasureHunt2D, Q):
+
+class Adaptor(TreasureHunt2D, Agent):
     def __init__(self, params=None, **kwargs):
         kwargs['mapfile'] = mapfile
         config = yaml.load(open(config_file))
@@ -220,10 +240,10 @@ class Adaptor(TreasureHunt2D, Q):
         self._defaultrewards = [-10, -0.5, None, 10, None]
         self._reward_dic = dict(zip(self._points, self._defaultrewards))
         self._custom = {
-            'show': self.display,
+            'show': self.render,
         }
         Q_params = config.get('Q')
-        Q.__init__(
+        Agent.__init__(
             self,
             state_set=self._state_space,
             action_set=self._action_space,
@@ -265,8 +285,8 @@ class Adaptor(TreasureHunt2D, Q):
     def available_actions(self, state):
         return self.available_moves(pos=state)
 
-    def display(self, state):
-        super().display(pos=state)
+    def render(self, state):
+        super().render(pos=state)
 
     def init(self):
         self._warrior_pos = (0, 0)
@@ -275,13 +295,13 @@ class Adaptor(TreasureHunt2D, Q):
     def run(self, choose_optimal_action):
         #pdb.set_trace()
         state = self._warrior_pos
-        super().display()
+        super().render()
         while True:
             time.sleep(self.run_sleep)
             action = choose_optimal_action(state=state)
             nstate = self.transfer(state=state, action=action)
             self.update_map(direction=action, pos=state)
-            super().display()
+            super().render()
             winning = self.check_win()
             if winning is None:
                 state = nstate
@@ -294,9 +314,9 @@ class Adaptor(TreasureHunt2D, Q):
 
 if __name__ == '__main__':
     th2d = TreasureHunt2D(10)
-    th2d.display()
+    th2d.render()
 
     #print(m)
     #th2d.move(direction=m[0])
     th2d.update_map(direction=m[0])
-    th2d.display()
+    th2d.render()
