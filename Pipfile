@@ -4,13 +4,11 @@ verify_ssl = true
 
 [packages]
 pandas = "==0.22.0"
-python-dateutil = "==2.7.2"
 colorline = "==1.0.3"
-pytz = "==2018.3"
 pyyaml = "==3.12"
-numpy = "==1.14.2"
+numpy = "*"
 matplotlib = "*"
-tensorflow = "*"
+sphinx = "*"
 
 [requires]
 python_version = "3.6"

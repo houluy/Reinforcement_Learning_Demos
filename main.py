@@ -1,6 +1,5 @@
-import Q.TreasureHunt.TreasureHunt as TreasureHunt
-import Q.TreasureHunt2D.TreasureHunt2D as T2D
-import Q.Caching as Caching
+import src.TreasureHunt.TreasureHunt as TreasureHunt
+import src.TreasureHunt2D.TreasureHunt2D as T2D
 
 import matplotlib.pyplot as plt
 import argparse
@@ -24,7 +23,7 @@ train_parser.add_argument('-s', '--show', help='Show the training process.', act
 train_parser.add_argument('-c', '--config_file', help='Config file for significant parameters', default=None)
 train_parser.add_argument('-d', '--demo', help='Choose a demo to run', choices=['1d', '2d'], default='2d')
 train_parser.add_argument('-a', '--heuristic', help='Whether to use a heuristic iteration', action='store_true', default=False)
-train_parser.add_argument('-g', '--algorithm', help='Training algorithm: Q, SARSA and Double Q, default is Q', choices=['Q', 'SARSA', 'DoubleQ'], default='Q')
+train_parser.add_argument('-g', '--algorithm', help='Training algorithm: Q_learning, SARSA, SARSA(λ) and Double Q, default is Q_learning', choices=['Q_learning', 'SARSA', 'SARSA_lambda', 'DoubleQLearning'], default='Q_learning')
 
 # Arguments for running
 run_parser.add_argument('-d', '--demo', help='Choose a demo to run', choices=['1d', '2d'], default='2d')

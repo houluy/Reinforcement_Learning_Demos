@@ -24,14 +24,9 @@ class QFileNotFoundError(OSError):
 class Agent:
     def __init__(
         self,
-        state_set,
-        action_set,
-        available_actions,
         env,
-        init,
         ahook=None,
         train_round=300,
-        run=None,
         start_states=None,
         init_stateset=None,
         end_states=None,
@@ -48,7 +43,7 @@ class Agent:
         phi=None,
         eta=0.9,
         iota=0.9,
-        display=True,
+        render=True,
         maximum_iteration=200000,
         sleep_time=0,
         heuristic=False,
@@ -56,7 +51,8 @@ class Agent:
         algorithm='Q',
     ):
         # Define state and action
-        self._state_set = state_set
+        self.env = env
+        self.state_set = env.observation_
         if start_states is None:
             self._state_start_at = start_at
             self._state_end_at = end_at
@@ -66,10 +62,6 @@ class Agent:
             self._init_state = start_states
             self._end_state = end_states
         self.step_end = False
-        self._action_set = action_set
-        self._available_actions = available_actions # Map between state and available actions
-        self._run = run
-        self._init = init
         self.ahook = ahook
         state_len, action_len = len(self._state_set), len(self._action_set)
         self._dimension = (state_len, action_len)
@@ -85,7 +77,6 @@ class Agent:
         self._eta = eta
         self._iota = iota
 
-        self.env = env
         
         # Generate Q table
         if load:
