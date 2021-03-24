@@ -6,9 +6,10 @@ import pandas as pd
 import numpy as np
 df = pd.DataFrame
 import os.path as path
-
 import functools
+
 from src.AI.agent import Agent
+from src.bases import *
 
 dir_path = path.dirname(path.abspath(__file__))
 config = path.join(dir_path, 'treasure.yaml')

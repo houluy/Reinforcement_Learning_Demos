@@ -61,7 +61,7 @@ game_dic = {
 }
 
 try:
-    th = game_dic.get(args.demo).Adaptor(params=params)
+    th = game_dic.get(args.demo)
     th.start(mode=args.train)
 except:
     type, value, tb = sys.exc_info()
