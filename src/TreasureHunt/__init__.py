@@ -8,7 +8,6 @@ df = pd.DataFrame
 import os.path as path
 import functools
 
-from src.AI.agent import Agent
 from src.bases import *
 
 dir_path = path.dirname(path.abspath(__file__))
@@ -27,10 +26,10 @@ class TreasureHunt:
         # Positions
         self.treasure_pos = self.observation_space[-1]
         self.trap_pos = self.observation_space[0]
-        self.observation = self.observation_space[1] # initial position
+        self.observation = self.reset() # initial position
         # Rewards
-        self.win_reward = 1
-        self.lose_reward = -1
+        self.win_reward = 10
+        self.lose_reward = -10
         self.wander_reward = -0.05
         self.reward_func = {
             self.treasure_pos: self.win_reward,
@@ -65,7 +64,7 @@ class TreasureHunt:
             pass
 
     def step(self, action):
-        next_state = self.observation + action
+        self.observation = next_state = self.observation + action
         reward = self.reward_func.get(next_state, self.wander_reward)
         if reward == self.wander_reward:
             done = False
@@ -75,7 +74,7 @@ class TreasureHunt:
         return next_state, reward, done, info
 
     def reset(self):
-        self.observation = self.observation_space[1]
+        self.observation = self.observation_space[int(self.size/2)]
         return self.observation
 
     def close(self):

@@ -26,18 +26,16 @@ class Agent:
         self,
         env,
         ahook=None,
-        episodes=300,
-        start_at=[0],
-        end_at=[-1],
+        episodes=30,
         config_file=None,
         q_file=defaultQfile,
         conv_file=defaultConvfile,
         load=False,
         custom_params=None,
-        epsilon_base=None,
-        gamma=None,
-        alpha=None,
-        phi=None,
+        epsilon_base=0.1,
+        gamma=1,
+        alpha=0.03,
+        phi=1e-3,
         eta=0.9,
         iota=0.9,
         render=True,
@@ -46,10 +44,15 @@ class Agent:
         heuristic=False,
         quit_mode='c',
         algorithm='Q',
+        action_filter=None,
     ):
         # Define state and action
         self.env = env
         self.ahook = ahook
+        if action_filter is None:
+            self.action_filter = lambda state: self.env.action_space
+        else:
+            self.action_filter = action_filter
         state_len, action_len = len(self.env.observation_space), len(self.env.action_space)
         self.dimension = (state_len, action_len)
         self.q_file = q_file
@@ -84,7 +87,7 @@ class Agent:
             self.phi = phi
 
         self.B = 100
-        self.A = self._alpha * self.B
+        self.A = self.alpha * self.B
         self.heuristic = heuristic
         self.quit_mode = quit_mode
 
@@ -129,12 +132,12 @@ class Agent:
                 if sleep:
                     time.sleep(self.sleep_time)
 
-    def display_train_info(self, train_round):
+    def display_episode_info(self, episode):
         if len(self.conv) > 2:
-            conv = self.conv[train_round - 1] - self.conv[train_round - 2]
+            conv = self.conv[-1] - self.conv[-2]
         else:
             conv = 0
-        print('train_round: {}, Convergence: {}'.format(train_round, conv))
+        print('episode: {}, Q sum: {}, Q Convergence: {}'.format(episode, self.conv[episode - 1], conv))
         #print('Convergence: {}'.format(self.conv[-1] - self.conv[-2] if len(self.conv) > 1 else self.conv[-1]))
         #print('Q table: {}'.format(Q_table))
 
@@ -152,31 +155,34 @@ class Agent:
         self.step_end = True
         self.ending_step = step
 
-    def alpha_log(self, itertime):
-        return np.log(itertime + 1)/(itertime + 1)
+    def alpha_log(self, episode):
+        return np.log(episode + 1)/(episode + 1)
 
-    def alpha_linear(self, itertime):
-        return self.A/(self.B + itertime)
+    def alpha_linear(self, episode):
+        return self.A/(self.B + episode)
 
-    def epsilon_linear(self, itertime):
-        return 1/(itertime*10 + 1)
+    def epsilon_linear(self, episode):
+        return 1/(episode*10 + 1)
 
     def epsilon_decay(self, episode):
         self.epsilon = self.epsilon_base/episode
 
+    def epsilon_unchanged(self, episode):
+        pass
+
     def epsilon_greedy_policy(self, state):
-        available_actions = self.available_actions(state=state)
-        if (len(available_actions) == 1):
-            return available_actions[0]
+        actions = self.action_filter(state)
+        if (len(actions) == 1):
+            return actions[0]
         else:
             if (np.random.uniform() < self.epsilon):
-                action = random.choice(available_actions)
+                action = random.choice(actions)
             else:
-                action = self.argmax(Q_table, state, available_actions)
+                action = self.argmax(self.q_table, state, actions)
             return action
 
     def greedy_policy(self, state):
-        return self.argmax(self.q_table, state=state, available=self.available_actions(state=state))
+        return self.argmax(self.q_table, state=state, available=self.action_filter(state))
 
     @staticmethod
     def argmax(Q_table, state, available=None):
@@ -189,7 +195,7 @@ class Agent:
         return np.random.choice(allmaxactions)
 
     def choose_heuristic_action(self, state):
-        available_actions = self.available_actions(state=state)
+        available_actions = self.available_actions(state)
         if (len(available_actions) == 1):
             return available_actions[0]
         else:
@@ -201,45 +207,37 @@ class Agent:
             return action
     
     def SARSA_train(self):
-        episodes = self.episodes
         episode = 1
         stop = False
         init_Q = self.q_table.copy()
         self.conv = np.array([0])
         self.epsilon = self.epsilon_base
-        while not stop:
-            self.env.reset()
-            state = self.env.observation
-            self.epsilon_decay(episode)
+        while episode < self.episodes:
+            state = self.env.reset()
+            # self.epsilon_decay(episode)
             action = self.epsilon_greedy_policy(state=state)
             done = False
             step = 1
+            self.display_episode_info(episode=episode)
             self.env.render()
             while not done:
-                self.display_train_info(train_round=train_round)
                 q_predict = self.q_table.loc[[state], [action]].values[0][0]
-                reward, next_state, done, info = self.env.step(action)
+                next_state, reward, done, info = self.env.step(action)
                 if done:
                     q = reward
                 else:
                     # Here is the critical difference
-                    next_action = self.choose_action(state=next_state, itertime=train_round)
+                    next_action = self.epsilon_greedy_policy(state=next_state)
                     q = reward + self.gamma * self.q_table.loc[[next_state], [next_action]].values[0][0]
-                self.q_table.loc[[state], [action]] += self.alpha_log(train_round) * (q - q_predict) 
-                state = next_state
-                action = next_action
+                    state = next_state
+                    action = next_action
+                self.q_table.loc[[state], [action]] += self.alpha * (q - q_predict) 
                 self.env.render()
                 step += 1
+            print(self.q_table)
+            pdb.set_trace()
             episode += 1
-            if self.quit_mode == 'c':
-                if step >= self.maximum_iteration:
-                    raise OutOfRangeException('The iteration time has exceeded the maximum value')
-                else:
-                    stop = self.convergence()
-            else:
-                #self.convergence(self._q_table.subtract(init_Q))
-                self.conv = np.append(self.conv, self.q_table.sum().sum())
-                stop = (train_round == total_round)
+            self.conv = np.append(self.conv, self.q_table.sum().sum())
             self.save_q()
             self.save_conv()
 
