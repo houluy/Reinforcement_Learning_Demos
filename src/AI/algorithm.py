@@ -26,15 +26,15 @@ class Agent:
         self,
         env,
         ahook=None,
-        episodes=30,
+        episodes=2000,
         config_file=None,
         q_file=defaultQfile,
         conv_file=defaultConvfile,
         load=False,
         custom_params=None,
-        epsilon_base=0.1,
+        epsilon_base=0.5,
         gamma=1,
-        alpha=0.03,
+        alpha=0.01,
         phi=1e-3,
         eta=0.9,
         iota=0.9,
@@ -45,6 +45,7 @@ class Agent:
         quit_mode='c',
         algorithm='Q',
         action_filter=None,
+        initial_q_mode="zero",
     ):
         # Define state and action
         self.env = env
@@ -66,6 +67,13 @@ class Agent:
         # self.H_table = self.build_q_table() # Heurisitc algorithm
         self.eta = eta
         self.iota = iota
+
+        self._q_init_func = {
+            "large": lambda dim: 100*np.ones(dim),
+            "zero": np.zeros,
+            "small": lambda dim: -100*np.ones(dim),
+            "random": np.random.random,
+        }
         
         # Generate Q table
         if load:
@@ -73,7 +81,7 @@ class Agent:
                 raise QFileNotFoundError('Please check if the Q file exists at: {}'.format(q_file))
             self.q_table = self.load_q(file_name=self.q_file)
         else:
-            self.q_table = self.build_q_table()
+            self.q_table = self.build_q_table(initial_q_mode)
 
         
         # Config all the necessary parameters
@@ -141,11 +149,12 @@ class Agent:
         #print('Convergence: {}'.format(self.conv[-1] - self.conv[-2] if len(self.conv) > 1 else self.conv[-1]))
         #print('Q table: {}'.format(Q_table))
 
-    def build_q_table(self):
+    def build_q_table(self, mode="zero"):
+        func = self._q_init_func[mode]
         index = self.env.observation_space
         columns = self.env.action_space
         Q_table = df(
-            np.zeros(self.dimension), # Q value initialization
+            func(self.dimension), # Q value initialization
             index=index,
             columns=columns,
         )
@@ -225,19 +234,23 @@ class Agent:
                 next_state, reward, done, info = self.env.step(action)
                 if done:
                     q = reward
+                    next_action = None
                 else:
                     # Here is the critical difference
                     next_action = self.epsilon_greedy_policy(state=next_state)
                     q = reward + self.gamma * self.q_table.loc[[next_state], [next_action]].values[0][0]
-                    state = next_state
-                    action = next_action
                 self.q_table.loc[[state], [action]] += self.alpha * (q - q_predict) 
-                self.env.render()
+                state = next_state
+                action = next_action
+                if self.render_flag:
+                    self.env.render()
                 step += 1
-            print(self.q_table)
-            pdb.set_trace()
             episode += 1
             self.conv = np.append(self.conv, self.q_table.sum().sum())
+            if episode > 2 and abs(self.conv[-1] - self.conv[-2]) < 1e-3:
+                print(episode)
+                print(self.q_table)
+                episode = self.episodes
             self.save_q()
             self.save_conv()
 
