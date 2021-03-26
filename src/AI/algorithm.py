@@ -27,7 +27,7 @@ class Agent:
         self,
         env,
         ahook=None,
-        episodes=2000,
+        episodes=1000,
         config_file=None,
         q_file=defaultQfile,
         conv_file=defaultConvfile,
@@ -233,7 +233,7 @@ class Agent:
         while episode < self.episodes:
             state = self.env.reset()
             action = self.epsilon_greedy_policy(state=state)
-            if algorithm == "SARSA_lambda":
+            if algorithm == "SARSA_lambda" or algorithm == "Q_lambda":
                 self._clear_et()
             # self.epsilon_decay(episode)
             done = False
@@ -250,18 +250,31 @@ class Agent:
                 else:
                     if algorithm == "SARSA" or algorithm == "SARSA_lambda":
                         target_q = self.q_table.at[next_state, next_action]
-                    elif algorithm == "Q_learning":
+                    elif algorithm == "Q_learning" or algorithm == "Q_lambda":
                         target_q = self.q_table.loc[next_state, :].max()
+                        if algorithm == "Q_lambda":
+                            exploration = not target_q == self.q_table.at[next_state, next_action]
                     elif algorithm == "Average_SARSA":
                         target_q = self.q_table.loc[next_state, :].mean()
                     td_target = reward + self.gamma * target_q
                 td_error = td_target - q
-                if algorithm == "SARSA_lambda":
+                if algorithm == "SARSA_lambda" or algorithm == "Q_lambda":
                     self.eligibility_trace.at[state, action] += 1
+                    ##print(self.q_table)
+                    ##self.q_table = pd.DataFrame(self.q_table.values * self.alpha * td_error * self.eligibility_trace.values, 
+                    ##        columns=self.q_table.columns, index=self.q_table.index)
+                    ##print(self.q_table)
+                    ##self.eligibility_trace = self.eligibility_trace.multiply(self.gamma * self.lmd)
                     for s in self.env.observation_space:
                         for a in self.env.action_space:
                             self.q_table.at[s, a] += self.alpha * td_error * self.eligibility_trace.at[s, a]
-                            self.eligibility_trace.at[s, a] *= self.gamma * self.lmd
+                            if algorithm == "SARSA_lambda":
+                                self.eligibility_trace.at[s, a] *= self.gamma * self.lmd
+                            elif algorithm == "Q_lambda":
+                                if exploration:
+                                    self.eligibility_trace.at[s, a] = 0
+                                else:
+                                    self.eligibility_trace.at[s, a] *= self.gamma * self.lmd
                 else:
                     self.q_table.at[state, action] += self.alpha * td_error
                 state = next_state
@@ -272,8 +285,8 @@ class Agent:
             conv = np.append(conv, self.q_table.sum().sum())
             conv_filename = f"{self.env.name}-{algorithm}-train-Q_convergence.txt"
             self.save_conv(self.result_path / conv_filename, conv)
-            if episode > 2 and abs(conv[-1] - conv[-2]) < self.phi:
-                break
+            #if episode > 2 and abs(conv[-1] - conv[-2]) < self.phi:
+            #    break
         return episode
 
     def SARSA_train(self):

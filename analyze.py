@@ -5,7 +5,7 @@ import numpy as np
 results_path = pathlib.Path("results")
 fig_path = pathlib.Path("figs")
 
-algorithms = ["Q_learning", "SARSA", "Average_SARSA", "SARSA_lambda"]
+algorithms = ["Q_learning", "SARSA", "Average_SARSA", "SARSA_lambda", "Q_lambda"]
 env = "TreasureHunt1D"
 
 stage = "train"

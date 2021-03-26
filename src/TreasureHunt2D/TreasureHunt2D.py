@@ -138,8 +138,8 @@ class TreasureHunt2D:
         amoves = self.available_moves(pos=(0, 1))
         print(amoves)
 
-    @check_pos
-    def render(self, pos=None):
+    def render(self):
+        pos = self.pos
         for x, row in self._maps.iterrows():
             print('|', end='')
             for y, col in row.iteritems():
