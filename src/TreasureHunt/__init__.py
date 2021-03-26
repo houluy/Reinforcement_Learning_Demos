@@ -22,6 +22,7 @@ tprint = functools.partial(cprint, color='r', bcolor='k', end='')
 class TreasureHunt:
     def __init__(self, size):
         self.size = size
+        self.name = "TreasureHunt1D"
         self.observation_space = list(range(self.size))
         # Positions
         self.treasure_pos = self.observation_space[-1]

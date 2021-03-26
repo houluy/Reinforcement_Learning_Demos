@@ -33,20 +33,20 @@ class Agent:
         conv_file=defaultConvfile,
         load=False,
         custom_params=None,
-        epsilon_base=0.3,
+        epsilon_base=0.1,
         gamma=1,
         alpha=0.1,
-        phi=1e-3,
+        phi=1e-4,
         eta=0.9,
         lmd=0.9, # lambda-return
         render=True,
-        maximum_iteration=200000,
         sleep_time=0,
         heuristic=False,
         quit_mode='c',
         algorithm='Q',
         action_filter=None,
         initial_q_mode="zero",
+        info_episodes=100,
     ):
         # Define state and action
         self.env = env
@@ -55,6 +55,8 @@ class Agent:
             self.action_filter = lambda state: self.env.action_space
         else:
             self.action_filter = action_filter
+
+        self.result_path = pathlib.Path("results")
         state_len, action_len = len(self.env.observation_space), len(self.env.action_space)
         self.dimension = (state_len, action_len)
         self.q_file = q_file
@@ -64,7 +66,7 @@ class Agent:
         self.sleep_time = sleep_time
         self.episodes = episodes
         self.render_flag = render
-        self.maximum_iteration = maximum_iteration
+        self.info_episodes = info_episodes
         # self.H_table = self.build_q_table() # Heurisitc algorithm
         self.eta = eta
         self.lmd = lmd
@@ -115,7 +117,7 @@ class Agent:
                 for col in self.eligibility_trace.columns:
                     self.eligibility_trace[col].values[:] = 0
             self._clear_et = functools.partial(_clear_et, self)
-        self.train = self.train_dict.get(self.train_algorithm)
+        #self.train = self.train_dict.get(self.train_algorithm)
 
     def load_config(self, config):
         seq = ['epsilon_base', 'gamma', 'alpha', 'phi']
@@ -132,8 +134,8 @@ class Agent:
     def save_q(self):
         self.q_table.to_csv(self.q_file, index=False, header=False)
 
-    def save_conv(self):
-        np.savetxt(self.conv_file, self.conv)
+    def save_conv(self, filename, conv):
+        np.savetxt(filename, conv)
 
     def save_reward(self):
         return np.array(self.reward_per_episode).mean()
@@ -145,12 +147,15 @@ class Agent:
                 if sleep:
                     time.sleep(self.sleep_time)
 
-    def display_episode_info(self, episode):
-        if len(self.conv) > 2:
-            conv = self.conv[-1] - self.conv[-2]
+    def display_episode_info(self, episode, conv):
+        if not episode % self.info_episodes:
+            if episode > 2:
+                conv_diff = conv[-1] - conv[-2]
+            else:
+                conv_diff = 0
+            print('episode: {}, Q sum: {}, Q Convergence: {}'.format(episode, conv[-1], conv_diff))
         else:
-            conv = 0
-        print('episode: {}, Q sum: {}, Q Convergence: {}'.format(episode, self.conv[episode - 1], conv))
+            pass
         #print('Convergence: {}'.format(self.conv[-1] - self.conv[-2] if len(self.conv) > 1 else self.conv[-1]))
         #print('Q table: {}'.format(Q_table))
 
@@ -219,7 +224,58 @@ class Agent:
             else:
                 action = all_Q.idxmax()
             return action
-    
+
+    def train(self, algorithm="Q_learning"):
+        episode = 1
+        stop = False
+        conv = np.array([0])
+        self.epsilon = self.epsilon_base
+        while episode < self.episodes:
+            state = self.env.reset()
+            action = self.epsilon_greedy_policy(state=state)
+            if algorithm == "SARSA_lambda":
+                self._clear_et()
+            # self.epsilon_decay(episode)
+            done = False
+            step = 1
+            self.display_episode_info(episode=episode, conv=conv)
+            while not done:
+                if self.render_flag:
+                    self.env.render()
+                q = self.q_table.at[state, action]
+                next_state, reward, done, info = self.env.step(action)
+                next_action = self.epsilon_greedy_policy(state=state)
+                if done:
+                    td_target = reward
+                else:
+                    if algorithm == "SARSA" or algorithm == "SARSA_lambda":
+                        target_q = self.q_table.at[next_state, next_action]
+                    elif algorithm == "Q_learning":
+                        target_q = self.q_table.loc[next_state, :].max()
+                    elif algorithm == "Average_SARSA":
+                        target_q = self.q_table.loc[next_state, :].mean()
+                    td_target = reward + self.gamma * target_q
+                td_error = td_target - q
+                if algorithm == "SARSA_lambda":
+                    self.eligibility_trace.at[state, action] += 1
+                    for s in self.env.observation_space:
+                        for a in self.env.action_space:
+                            self.q_table.at[s, a] += self.alpha * td_error * self.eligibility_trace.at[s, a]
+                            self.eligibility_trace.at[s, a] *= self.gamma * self.lmd
+                else:
+                    self.q_table.at[state, action] += self.alpha * td_error
+                state = next_state
+                action = next_action
+                step += 1
+            episode += 1
+            self.save_q()
+            conv = np.append(conv, self.q_table.sum().sum())
+            conv_filename = f"{self.env.name}-{algorithm}-train-Q_convergence.txt"
+            self.save_conv(self.result_path / conv_filename, conv)
+            if episode > 2 and abs(conv[-1] - conv[-2]) < self.phi:
+                break
+        return episode
+
     def SARSA_train(self):
         episode = 1
         stop = False
@@ -232,8 +288,9 @@ class Agent:
             done = False
             step = 1
             self.display_episode_info(episode=episode)
-            self.env.render()
             while not done:
+                if self.render_flag:
+                    self.env.render()
                 q_predict = self.q_table.at[state, action]
                 next_state, reward, done, info = self.env.step(action)
                 if done:
@@ -246,14 +303,10 @@ class Agent:
                 self.q_table.at[state, action] += self.alpha * (q - q_predict) 
                 state = next_state
                 action = next_action
-                if self.render_flag:
-                    self.env.render()
                 step += 1
             episode += 1
             self.conv = np.append(self.conv, self.q_table.sum().sum())
             if episode > 2 and abs(self.conv[-1] - self.conv[-2]) < 1e-3:
-                print(episode)
-                print(self.q_table)
                 episode_return = episode
                 episode = self.episodes
             self.save_q()
@@ -301,9 +354,6 @@ class Agent:
             episode += 1
             self.conv = np.append(self.conv, self.q_table.sum().sum())
             if episode > 2 and abs(self.conv[-1] - self.conv[-2]) < 1e-3:
-                print(episode)
-                print(self.q_table)
-                print(self.eligibility_trace)
                 episode_return = episode
                 episode = self.episodes
             self.save_q()
@@ -312,7 +362,7 @@ class Agent:
 
     def Q_learning_train(self):
         episode = 1
-        self.conv = np.array([0])
+        conv = np.array([0])
         self.epsilon = self.epsilon_base
         while episode < self.episodes:
             state = self.env.reset()
@@ -320,8 +370,9 @@ class Agent:
             done = False
             step = 1
             self.display_episode_info(episode=episode)
-            self.env.render()
             while not done:
+                if self.render_flag:
+                    self.env.render()
                 action = self.epsilon_greedy_policy(state=state)
                 q_predict = self.q_table.at[state, action]
                 next_state, reward, done, info = self.env.step(action)
@@ -332,18 +383,15 @@ class Agent:
                     q = reward + self.gamma * self.q_table.loc[next_state, :].max()
                 self.q_table.at[state, action] += self.alpha * (q - q_predict) 
                 state = next_state
-                if self.render_flag:
-                    self.env.render()
                 step += 1
             episode += 1
-            self.conv = np.append(self.conv, self.q_table.sum().sum())
-            if episode > 2 and abs(self.conv[-1] - self.conv[-2]) < 1e-3:
-                print(episode)
-                print(self.q_table)
+            conv = np.append(conv, self.q_table.sum().sum())
+            if episode > 2 and abs(conv[-1] - conv[-2]) < 1e-3:
                 episode_return = episode
                 episode = self.episodes
             self.save_q()
-            self.save_conv()
+            conv_filename = f"{self.env.name}-{algorithm}-train-Q_convergence.txt"
+            self.save_conv(self.result_path / conv_filename, conv)
         return episode_return
 
     def DoubleQ_train(self):
@@ -403,6 +451,17 @@ class Agent:
             self._save_conv()
         return self.conv
 
+    def run(self):
+        state = self.env.reset()
+        done = False
+        total_reward = 0
+        while not done:
+            action = self.greedy_policy(state)
+            next_state, reward, done, info = self.env.step(action)
+            self.env.render()
+            total_reward += reward
+            state = next_state
+        print(f"Total reward: {total_reward}")
 
     def plot_conv(self):
         plt.figure()
@@ -434,7 +493,7 @@ class Agent:
         return reward/self._dimension[0], reward2
 
     def convergence(self):
-        if self.conv.size > 2 and 0 <= self.conv[-1] - self.conv[-2] < self._phi:
+        if self.conv.size > 2 and 0 <= self.conv[-1] - self.conv[-2] < self.phi:
             return True
         else:
             return False
