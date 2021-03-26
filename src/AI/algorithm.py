@@ -8,6 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import time
 import pathlib
+import functools
 
 file_path = pathlib.Path(__file__).parent
 defaultQfile = file_path / 'Q.csv'
@@ -32,12 +33,12 @@ class Agent:
         conv_file=defaultConvfile,
         load=False,
         custom_params=None,
-        epsilon_base=0.5,
+        epsilon_base=0.3,
         gamma=1,
-        alpha=0.01,
+        alpha=0.1,
         phi=1e-3,
         eta=0.9,
-        iota=0.9,
+        lmd=0.9, # lambda-return
         render=True,
         maximum_iteration=200000,
         sleep_time=0,
@@ -66,7 +67,7 @@ class Agent:
         self.maximum_iteration = maximum_iteration
         # self.H_table = self.build_q_table() # Heurisitc algorithm
         self.eta = eta
-        self.iota = iota
+        self.lmd = lmd
 
         self._q_init_func = {
             "large": lambda dim: 100*np.ones(dim),
@@ -82,8 +83,8 @@ class Agent:
             self.q_table = self.load_q(file_name=self.q_file)
         else:
             self.q_table = self.build_q_table(initial_q_mode)
+        self.q_table_backup = self.q_table.copy()
 
-        
         # Config all the necessary parameters
         if config_file:
             config = yaml.load(open(config_file))
@@ -100,7 +101,7 @@ class Agent:
         self.quit_mode = quit_mode
 
         self.train_dict = {
-            'Q': self.Q_train,
+            'Q_learning': self.Q_learning_train,
             'SARSA': self.SARSA_train,
             'DoubleQ': self.DoubleQ_train,
             "SARSA_lambda": self.SARSA_lambda_train,
@@ -109,7 +110,11 @@ class Agent:
         if self.train_algorithm == 'DoubleQ':
             self.qb_table = self._q_table.copy()
         elif self.train_algorithm == "SARSA_lambda":
-            self.eligibility_trace = self._q_table.copy()
+            self.eligibility_trace = self.build_q_table(mode="zero")
+            def _clear_et(self):
+                for col in self.eligibility_trace.columns:
+                    self.eligibility_trace[col].values[:] = 0
+            self._clear_et = functools.partial(_clear_et, self)
         self.train = self.train_dict.get(self.train_algorithm)
 
     def load_config(self, config):
@@ -218,7 +223,6 @@ class Agent:
     def SARSA_train(self):
         episode = 1
         stop = False
-        init_Q = self.q_table.copy()
         self.conv = np.array([0])
         self.epsilon = self.epsilon_base
         while episode < self.episodes:
@@ -230,7 +234,7 @@ class Agent:
             self.display_episode_info(episode=episode)
             self.env.render()
             while not done:
-                q_predict = self.q_table.loc[[state], [action]].values[0][0]
+                q_predict = self.q_table.at[state, action]
                 next_state, reward, done, info = self.env.step(action)
                 if done:
                     q = reward
@@ -238,8 +242,8 @@ class Agent:
                 else:
                     # Here is the critical difference
                     next_action = self.epsilon_greedy_policy(state=next_state)
-                    q = reward + self.gamma * self.q_table.loc[[next_state], [next_action]].values[0][0]
-                self.q_table.loc[[state], [action]] += self.alpha * (q - q_predict) 
+                    q = reward + self.gamma * self.q_table.at[next_state, next_action]
+                self.q_table.at[state, action] += self.alpha * (q - q_predict) 
                 state = next_state
                 action = next_action
                 if self.render_flag:
@@ -250,89 +254,97 @@ class Agent:
             if episode > 2 and abs(self.conv[-1] - self.conv[-2]) < 1e-3:
                 print(episode)
                 print(self.q_table)
+                episode_return = episode
                 episode = self.episodes
             self.save_q()
             self.save_conv()
+        return episode_return
 
     def SARSA_lambda_train(self):
-        total_episode = self._train_round
         episode = 1
-        stop = False
-        while not stop:
-            self.env.reset()
-            state = self.env.observation
-            action = self.choose_action(state=state, itertime=episode)
-            self._display_train_info(train_round=train_round)
-            self._display(state=state)
-            done = False
-            step = 1
-            current_reward = 0
-            while not done:
-                q_predict = self._q_table.loc[[state], [action]].values[0][0]
-                reward, next_state, done, info = self.env.step(action)
-                current_reward += reward
-                self._eligibility_trace.loc[[state], [action]] += 1
-                next_action = self.choose_action(state=next_state, itertime=episode)
-                # TD error
-                delta = reward + self._gamma * self._q_table.loc[[next_state], [next_action]] - q_predict
-                # Iterate all state and action and update the Q value
-                #for 
-
-
-    def Q_train(self):
-        total_round = self._train_round
-        train_round = 1
-        stop = False
-        self._H_table = self.build_q_table() # Heurisitc algorithm
-        init_Q = self._q_table.copy()
         self.conv = np.array([0])
-        self.reward_per_episode = []
-        while not stop:
-            self.env.reset()
-            state = self.env.observation
-            self.move_count = self.build_q_table()
-            self._display_train_info(train_round=train_round)
-            self._display(state=state)
+        self.epsilon = self.epsilon_base
+        while episode < self.episodes:
+            state = self.env.reset()
+            action = self.epsilon_greedy_policy(state)
+            self._clear_et()
+            self.display_episode_info(episode=episode)
+            self.render()
             done = False
             step = 1
             current_reward = 0
+            #pdb.set_trace()
             while not done:
-                self._display_train_info(train_round=train_round)
-                if not self._heuristic:
-                    action = self.choose_action(state=state, itertime=train_round)
-                else:
-                    action = self.choose_heuristic_action(state=state, train_round=train_round)
-                q_predict = self._q_table.loc[[state], [action]].values[0][0]
-                reward, next_state, done, info = self.env.step(action)
+                q_predict = self.q_table.at[state, action]
+                next_state, reward, done, info = self.env.step(action)
                 current_reward += reward
-                self.move_count.loc[[state], [action]] += 1
+                if done:
+                    delta = reward - q_predict
+                    next_action = None
+                else:
+                    next_action = self.epsilon_greedy_policy(state=next_state)
+                    # TD error
+                    delta = reward + self.gamma * self.q_table.at[next_state, next_action] - q_predict
+                self.eligibility_trace.at[state, action] += 1
+                # Iterate all state and action and update the Q value
+                for s in self.env.observation_space:
+                    for a in self.env.action_space:
+                        self.q_table.at[s, a] += self.alpha * delta * self.eligibility_trace.at[s, a]
+                        self.eligibility_trace.at[s, a] *= self.lmd * self.gamma
+                #print(f"DEBUG: state: {state}, action: {action}, next_state: {next_state}, next_action: {next_action}")
+                state = next_state
+                action = next_action
+                if self.render_flag:
+                    self.env.render()
+                step += 1
+                #pdb.set_trace()
+            episode += 1
+            self.conv = np.append(self.conv, self.q_table.sum().sum())
+            if episode > 2 and abs(self.conv[-1] - self.conv[-2]) < 1e-3:
+                print(episode)
+                print(self.q_table)
+                print(self.eligibility_trace)
+                episode_return = episode
+                episode = self.episodes
+            self.save_q()
+            self.save_conv()
+        return episode_return
+
+    def Q_learning_train(self):
+        episode = 1
+        self.conv = np.array([0])
+        self.epsilon = self.epsilon_base
+        while episode < self.episodes:
+            state = self.env.reset()
+            # self.epsilon_decay(episode)
+            done = False
+            step = 1
+            self.display_episode_info(episode=episode)
+            self.env.render()
+            while not done:
+                action = self.epsilon_greedy_policy(state=state)
+                q_predict = self.q_table.at[state, action]
+                next_state, reward, done, info = self.env.step(action)
                 if done:
                     q = reward
-                    end = True
-                    self.reward_per_episode.append(current_reward)
                 else:
-                    q = reward + self._gamma * self._q_table.loc[[next_state], :].max().max()
-                self._H_table.loc[[state], :] = 0
-                self._H_table.loc[[state], [action]] = self._q_table.loc[[state], :].max().max() - self._q_table.loc[[state], [action]] + self._eta
-                self._q_table.loc[[state], [action]] += self.alpha_log(train_round) * (q - q_predict)
+                    # Here is the critical difference
+                    q = reward + self.gamma * self.q_table.loc[next_state, :].max()
+                self.q_table.at[state, action] += self.alpha * (q - q_predict) 
                 state = next_state
-                self._display(state=state)
+                if self.render_flag:
+                    self.env.render()
                 step += 1
-            train_round += 1
-            if self._quit_mode == 'c':
-                if step >= self._maximum_iteration:
-                    raise OutOfRangeException('The iteration time has exceeded the maximum value')
-                else:
-                    stop = self.convergence()
-            else:
-                #self.convergence(self._q_table.subtract(init_Q))
-                self.conv = np.append(self.conv, self._q_table.sum().sum())
-                stop = (train_round == total_round)
+            episode += 1
+            self.conv = np.append(self.conv, self.q_table.sum().sum())
+            if episode > 2 and abs(self.conv[-1] - self.conv[-2]) < 1e-3:
+                print(episode)
+                print(self.q_table)
+                episode_return = episode
+                episode = self.episodes
             self.save_q()
-            self._save_conv()
-        if self.ahook:
-            self.ahook()
-        return self.conv
+            self.save_conv()
+        return episode_return
 
     def DoubleQ_train(self):
         total_round = self._train_round
