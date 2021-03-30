@@ -103,6 +103,7 @@ class TreasureHunt2D:
             self.size, self.all_coordinates, self.trap, self.path, self.wall, self.treasure, self.observation = self.rec_randmap(self.maps)
             self.treasure = self.treasure[0]
             self.observation = (0, 0)
+        self.name = "TreasureHunt2D"
         self.terminal_points = self.trap + [self.treasure]
         self.run_sleep = 0.1
         self.warrior_ch = warrior_ch
@@ -121,6 +122,7 @@ class TreasureHunt2D:
         self.action_space = [(0, 1), (1, 0), (0, -1), (-1, 0)]
         self.directions_str = ['↓', '→', '↑', '←']
         self.direction = dict(zip(self.action_space, self.directions_str))
+        #TODO
         self.defaultrewards = [-10, -0.5, None, 10, None]
         self.reward_dic = dict(zip(self.points, self.defaultrewards))
 
@@ -161,7 +163,7 @@ class TreasureHunt2D:
         npos = self.move(direction=direction, pos=pos)
         return self.check_win(pos=npos)
  
-    def available_actions(self, state):
+    def action_filter(self, state):
         all_moves = self.action_space
         amoves = []
         for move in all_moves:
@@ -179,7 +181,7 @@ class TreasureHunt2D:
         self.maps.at[self.observation] = 0
         self.observation = self.move(direction=action)
         #self.maps.at[self.observation] = 1
-        print(self.observation)
+        #print(self.observation)
         reward = self.reward_dic[self.maps.at[self.observation]]
         done = False
         if self.observation in self.terminal_points:
@@ -218,7 +220,7 @@ class TreasureHunt2D:
         self.render()
         while not done:
             time.sleep(self.run_sleep)
-            action = random.choice(self.available_actions(state))
+            action = random.choice(self.action_filter(state))
             next_state, reward, done, info = self.step(action=action)
             self.render()
             if done:
@@ -260,7 +262,7 @@ class Adaptor(TreasureHunt2D, Agent):
             end_states=self._terminal_points,
             init=self.init,
             ahook=self.save_map,
-            available_actions=self.available_actions,
+            available_actions=self.action_filter,
             reward_func=self.reward,
             transition_func=self.transfer,
             q_file=Q_file,

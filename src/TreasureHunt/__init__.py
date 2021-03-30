@@ -20,10 +20,10 @@ oprint = functools.partial(cprint, color='b', bcolor='k', end='')
 tprint = functools.partial(cprint, color='r', bcolor='k', end='')
 
 class TreasureHunt:
-    def __init__(self, size):
+    def __init__(self, size=10):
         self.size = size
         self.name = "TreasureHunt1D"
-        self.observation_space = list(range(self.size))
+        self.observation_space = [(i, ) for i in range(self.size)]
         # Positions
         self.treasure_pos = self.observation_space[-1]
         self.trap_pos = self.observation_space[0]
@@ -52,11 +52,11 @@ class TreasureHunt:
         if mode == "human":
             pstate = self.observation
             for i in range(self.size):
-                if i == pstate:
+                if i == pstate[0]:
                     oprint(self.warrior_sign)
-                elif i == self.treasure_pos:
+                elif i == self.treasure_pos[0]:
                     tprint(self.treasure_sign)
-                elif i == self.trap_pos:
+                elif i == self.trap_pos[0]:
                     tprint(self.trap_sign)
                 else:
                     print(self.path_sign, end='')
@@ -64,8 +64,8 @@ class TreasureHunt:
         else:
             pass
 
-    def step(self, action):
-        self.observation = next_state = self.observation + action
+    def step(self, action: int):
+        self.observation = next_state = (self.observation[0] + action, )
         reward = self.reward_func.get(next_state, self.wander_reward)
         if reward == self.wander_reward:
             done = False

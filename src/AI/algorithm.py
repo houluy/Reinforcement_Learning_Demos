@@ -44,18 +44,13 @@ class Agent:
         heuristic=False,
         quit_mode='c',
         algorithm='Q',
-        action_filter=None,
         initial_q_mode="zero",
         info_episodes=100,
     ):
         # Define state and action
         self.env = env
         self.ahook = ahook
-        if action_filter is None:
-            self.action_filter = lambda state: self.env.action_space
-        else:
-            self.action_filter = action_filter
-
+        self.action_filter = getattr(env, "action_filter", lambda state: self.env.action_space)
         self.result_path = pathlib.Path("results")
         state_len, action_len = len(self.env.observation_space), len(self.env.action_space)
         self.dimension = (state_len, action_len)
@@ -128,7 +123,7 @@ class Agent:
             file_name = self.q_file
         self.q_table = pd.read_csv(file_name, header=None, index_col=False)
         self.q_table.columns = self.env.action_space
-        self.q_table.index = self.env.observation_space
+        self.q_table.index = pd.MultiIndex.from_tuples(self.env.observation_space)
         return self.q_table
 
     def save_q(self):
@@ -161,7 +156,7 @@ class Agent:
 
     def build_q_table(self, mode="zero"):
         func = self._q_init_func[mode]
-        index = self.env.observation_space
+        index = pd.MultiIndex.from_tuples(self.env.observation_space)
         columns = self.env.action_space
         Q_table = df(
             func(self.dimension), # Q value initialization
