@@ -104,7 +104,6 @@ class Agent:
         # Set eligitbility trace to zero
         self._clear_et = functools.partial(_clear, self, "eligibility_trace")
 
-
         #self.train_dict = {
         #    'Q_learning': self.Q_learning_train,
         #    'SARSA': self.SARSA_train,
@@ -291,7 +290,7 @@ class Agent:
             self.save_conv(self.result_path / conv_filename, conv)
             #if episode > 2 and abs(conv[-1] - conv[-2]) < self.phi:
             #    break
-        return episode
+        return episode, conv
 
     def SARSA_train(self):
         episode = 1
