@@ -34,6 +34,7 @@ class Agent:
         load=False,
         custom_params=None,
         epsilon_base=0.1,
+        epsilon_decay_rate=1,
         gamma=1,
         learning_rate=0.1,
         phi=1e-4,
@@ -61,7 +62,6 @@ class Agent:
         self.episodes = episodes
         self.train_render = train_render
         self.info_episodes = info_episodes
-        # self.H_table = self.build_q_table() # Heurisitc algorithm
         self.eta = eta
         self.lmd = lmd
 
@@ -87,6 +87,7 @@ class Agent:
             self.load_config(config=config)
         else:
             self.epsilon_base = epsilon_base
+            self.epsilon_decay_rate = epsilon_decay_rate
             self.gamma = gamma
             self.learning_rate = learning_rate
             self.phi = phi
@@ -149,8 +150,8 @@ class Agent:
                 if sleep:
                     time.sleep(self.sleep_time)
 
-    def display_episode_info(self, episode, q_sum):
-        if not episode % self.info_episodes:
+    def display_episode_info(self, episode, q_sum, force=False):
+        if force or not episode % self.info_episodes:
             if episode > 2:
                 conv_diff = q_sum[episode - 1] - q_sum[episode - 2]
             else:
@@ -186,7 +187,7 @@ class Agent:
         return 1/(episode*10 + 1)
 
     def epsilon_decay(self, episode):
-        self.epsilon = self.epsilon_base/episode
+        self.epsilon = self.epsilon_base * self.epsilon_decay_rate/episode
 
     def epsilon_unchanged(self, episode):
         pass
@@ -229,7 +230,7 @@ class Agent:
             return action
 
     def train(self, algorithm="Q_learning"):
-        episode = 1
+        episode = 0
         stop = False
         q_sum = np.zeros((self.episodes,))
         self.epsilon = self.epsilon_base
@@ -249,6 +250,7 @@ class Agent:
                 next_action = self.epsilon_greedy_policy(state=next_state)
                 if done:
                     td_target = reward
+                    exploration = True  # Force to set ET to zero
                 else:
                     if algorithm == "SARSA" or algorithm == "SARSA_lambda":
                         target_q = self.q_table.at[next_state, next_action]
@@ -283,13 +285,15 @@ class Agent:
                 action = next_action
                 step += 1
             self.save_q()
-            q_sum[episode - 1] = self.q_table.sum().sum()
+            q_sum[episode] = self.q_table.sum().sum()
             self.display_episode_info(episode=episode, q_sum=q_sum)
             episode += 1
+            self.epsilon_decay(episode)
             q_sum_filename = f"{self.env.name}-{algorithm}-train-Q_sum.txt"
             self.save_conv(self.result_path / q_sum_filename, q_sum)
             #if episode > 2 and abs(conv[-1] - conv[-2]) < self.phi:
             #    break
+        self.display_episode_info(episode=episode, q_sum=q_sum, force=True)
         return episode, q_sum
 
     def SARSA_train(self):

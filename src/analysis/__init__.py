@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import pathlib
+import pathlib 
 import numpy as np
 
 
@@ -102,24 +102,22 @@ class Result:
 
 
 class Visualization:
-    def __init__(self, results):
+    def __init__(self, result):
         self.fig_path = pathlib.Path("figs")
-        self.results = results
+        self.result = result
    
-    def each_algorithm(self, metric_name="conv"):
+    def plot_by_metric(self, metric="q_sum"):
         fig = plt.figure()
-        for algo, target in self.results.items():
-            for value, mtcs in target.items():
-                plt.plot(mtcs[metric_name], label=f"{algo}-{value}")
-        plt.title(f"{metric_name} of different algorithms")
+        for alg in self.result.algorithms:
+            for obj in self.result.objective_values:
+                plt.plot(self.result[(alg, obj, metric)], label=f"{alg}-{self.result.evaluation_objective}={obj}")
+        plt.title(f"{metric} of different algorithms include {' '.join(self.result.algorithms)}\n"
+            f"with {self.result.evaluation_objective} ranges\n"
+            f"in [{self.result.objective_values[0]}, {self.result.objective_values[-1]}]")
         plt.xlabel("Number of episodes")
-        plt.ylabel(f"Value of {metric_name}")
+        plt.ylabel(f"Value of {metric}")
         plt.legend()
-        plt.savefig(self.fig_path / metric_name)
-
-    def each_metric(self):
-        pass
-
+        plt.savefig(self.fig_path / metric)
 
 
 #results_path = pathlib.Path("results")
