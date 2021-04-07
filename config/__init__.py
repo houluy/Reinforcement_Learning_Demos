@@ -10,7 +10,7 @@ evaluate_render = True
 # List of algorithms that are used to train
 
 algorithms = ["Q_learning", "SARSA_lambda"]
-metrics = ["episode_number", "conv"]#"q_sum", "q_average"]
+metrics = ["q_sum"]#"q_sum", "q_average"]
 
 learning_rate = 0.01
 
@@ -20,8 +20,10 @@ gamma = 1
 
 lmd = 0.9  # For lambda-return
 
+episodes = 500
+
 evaluation_objective = "learning_rate"
 evaluation_number = 2
 evaluation_step = 0.01
-evaluation_range = [learning_rate + evaluation_step * i for i in range(evaluation_number)]
+objective_values = [learning_rate + evaluation_step * i for i in range(evaluation_number)]
 

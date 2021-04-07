@@ -12,7 +12,7 @@ import functools
 
 file_path = pathlib.Path(__file__).parent
 defaultQfile = file_path / 'Q.csv'
-defaultConvfile = file_path / 'conv.csv'
+defaultConvfile = file_path / 'q_sum.csv'
 
 df = pd.DataFrame
 
@@ -149,13 +149,13 @@ class Agent:
                 if sleep:
                     time.sleep(self.sleep_time)
 
-    def display_episode_info(self, episode, conv):
+    def display_episode_info(self, episode, q_sum):
         if not episode % self.info_episodes:
             if episode > 2:
-                conv_diff = conv[-1] - conv[-2]
+                conv_diff = q_sum[episode - 1] - q_sum[episode - 2]
             else:
                 conv_diff = 0
-            print('episode: {}, Q sum: {}, Q Convergence: {}'.format(episode, conv[-1], conv_diff))
+            print('episode: {}, Q sum: {}, Q Convergence: {}'.format(episode, q_sum[episode - 1], conv_diff))
         else:
             pass
         #print('Convergence: {}'.format(self.conv[-1] - self.conv[-2] if len(self.conv) > 1 else self.conv[-1]))
@@ -231,7 +231,7 @@ class Agent:
     def train(self, algorithm="Q_learning"):
         episode = 1
         stop = False
-        conv = np.array([0])
+        q_sum = np.zeros((self.episodes,))
         self.epsilon = self.epsilon_base
         while episode < self.episodes:
             state = self.env.reset()
@@ -241,7 +241,6 @@ class Agent:
             # self.epsilon_decay(episode)
             done = False
             step = 1
-            self.display_episode_info(episode=episode, conv=conv)
             while not done:
                 if self.train_render:
                     self.env.render()
@@ -283,14 +282,15 @@ class Agent:
                 state = next_state
                 action = next_action
                 step += 1
-            episode += 1
             self.save_q()
-            conv = np.append(conv, self.q_table.sum().sum())
-            conv_filename = f"{self.env.name}-{algorithm}-train-Q_convergence.txt"
-            self.save_conv(self.result_path / conv_filename, conv)
+            q_sum[episode - 1] = self.q_table.sum().sum()
+            self.display_episode_info(episode=episode, q_sum=q_sum)
+            episode += 1
+            q_sum_filename = f"{self.env.name}-{algorithm}-train-Q_sum.txt"
+            self.save_conv(self.result_path / q_sum_filename, q_sum)
             #if episode > 2 and abs(conv[-1] - conv[-2]) < self.phi:
             #    break
-        return episode, conv
+        return episode, q_sum
 
     def SARSA_train(self):
         episode = 1
@@ -479,7 +479,7 @@ class Agent:
             state = next_state
         print(f"Total reward: {total_reward}")
 
-    def plot_conv(self):
+    def plot_q_sum(self):
         plt.figure()
         plt.plot(range(len(self.conv)), self.conv)
 
