@@ -106,18 +106,19 @@ class Visualization:
         self.fig_path = pathlib.Path("figs")
         self.result = result
    
-    def plot_by_metric(self, metric="q_sum"):
-        fig = plt.figure()
-        for alg in self.result.algorithms:
-            for obj in self.result.objective_values:
-                plt.plot(self.result[(alg, obj, metric)], label=f"{alg}-{self.result.evaluation_objective}={obj}")
-        plt.title(f"{metric} of different algorithms include {' '.join(self.result.algorithms)}\n"
-            f"with {self.result.evaluation_objective} ranges\n"
-            f"in [{self.result.objective_values[0]}, {self.result.objective_values[-1]}]")
-        plt.xlabel("Number of episodes")
-        plt.ylabel(f"Value of {metric}")
-        plt.legend()
-        plt.savefig(self.fig_path / metric)
+    def plot_by_metric(self, metrics=["q_sum"]):
+        for ind, metric in enumerate(metrics):
+            fig = plt.figure(ind)
+            for alg in self.result.algorithms:
+                for obj in self.result.objective_values:
+                    plt.plot(self.result[(alg, obj, metric)], label=f"{alg}-{self.result.evaluation_objective}={obj}")
+            plt.title(f"{metric} of different algorithms include {' '.join(self.result.algorithms)}\n"
+                f"with {self.result.evaluation_objective} ranges\n"
+                f"in [{self.result.objective_values[0]}, {self.result.objective_values[-1]}]")
+            plt.xlabel("Number of episodes")
+            plt.ylabel(f"Value of {metric}")
+            plt.legend()
+            plt.savefig(self.fig_path / metric)
 
 
 #results_path = pathlib.Path("results")

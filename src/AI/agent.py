@@ -150,13 +150,14 @@ class Agent:
                 if sleep:
                     time.sleep(self.sleep_time)
 
-    def display_episode_info(self, episode, q_sum, force=False):
+    def display_episode_info(self, episode, q_sum, episode_reward, force=False):
         if force or not episode % self.info_episodes:
             if episode > 2:
-                conv_diff = q_sum[episode - 1] - q_sum[episode - 2]
+                diff = q_sum[episode - 1] - q_sum[episode - 2]
             else:
-                conv_diff = 0
-            print('episode: {}, Q sum: {}, Q Convergence: {}'.format(episode, q_sum[episode - 1], conv_diff))
+                diff = 0
+            print(f"Training Info: episode: {episode}, Q sum: {q_sum[episode - 1]}, ",
+            f"episode reward: {episode_reward}, Q Convergence: {diff}")
         else:
             pass
         #print('Convergence: {}'.format(self.conv[-1] - self.conv[-2] if len(self.conv) > 1 else self.conv[-1]))
@@ -233,6 +234,7 @@ class Agent:
         episode = 0
         stop = False
         q_sum = np.zeros((self.episodes,))
+        episode_total_reward = np.zeros((self.episodes,))
         self.epsilon = self.epsilon_base
         while episode < self.episodes:
             state = self.env.reset()
@@ -242,12 +244,15 @@ class Agent:
             # self.epsilon_decay(episode)
             done = False
             step = 1
+            # Total reward of one episode
+            episode_reward = 0
             while not done:
                 if self.train_render:
                     self.env.render()
                 q = self.q_table.at[state, action]
                 next_state, reward, done, info = self.env.step(action)
                 next_action = self.epsilon_greedy_policy(state=next_state)
+                episode_reward += reward
                 if done:
                     td_target = reward
                     exploration = True  # Force to set ET to zero
@@ -286,15 +291,20 @@ class Agent:
                 step += 1
             self.save_q()
             q_sum[episode] = self.q_table.sum().sum()
-            self.display_episode_info(episode=episode, q_sum=q_sum)
+            episode_total_reward[episode] = episode_reward
+            self.display_episode_info(episode=episode, q_sum=q_sum, episode_reward=episode_reward)
             episode += 1
             self.epsilon_decay(episode)
             q_sum_filename = f"{self.env.name}-{algorithm}-train-Q_sum.txt"
             self.save_conv(self.result_path / q_sum_filename, q_sum)
             #if episode > 2 and abs(conv[-1] - conv[-2]) < self.phi:
             #    break
-        self.display_episode_info(episode=episode, q_sum=q_sum, force=True)
-        return episode, q_sum
+        self.display_episode_info(episode=episode, q_sum=q_sum, episode_reward=episode_reward, force=True)
+        return {
+            "episode_number": episode,
+            "q_sum": q_sum,
+            "episode_total_reward": episode_total_reward,
+        }
 
     def SARSA_train(self):
         episode = 1
