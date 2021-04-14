@@ -1,14 +1,16 @@
 import yaml
 import pdb
 import json
+import os
 
 import numpy as np
 import random
 import pandas as pd
-import matplotlib.pyplot as plt
 import time
 import pathlib
 import functools
+
+from src.analysis import Result
 
 file_path = pathlib.Path(__file__).parent
 defaultQfile = file_path / 'Q.csv'
@@ -27,12 +29,9 @@ class Agent:
         self,
         env,
         ahook=None,
-        episodes=1000,
-        config_file=None,
+        max_train_episodes=1000,
         q_file=defaultQfile,
-        conv_file=defaultConvfile,
         load=False,
-        custom_params=None,
         epsilon_base=0.1,
         epsilon_decay_rate=1,
         gamma=1,
@@ -40,12 +39,15 @@ class Agent:
         phi=1e-4,
         eta=0.9,
         lmd=0.9, # lambda-return
-        train_render=True,
-        sleep_time=0,
+        train_render=False,
+        train_render_interval=0,
+        train_render_clear=False,
+        termination_type="episode",
+        termination_precision=None,
         heuristic=False,
-        quit_mode='c',
         initial_q_mode="zero",
         info_episodes=100,
+        result=None,
     ):
         # Define state and action
         self.env = env
@@ -55,12 +57,12 @@ class Agent:
         state_len, action_len = len(self.env.observation_space), len(self.env.action_space)
         self.dimension = (state_len, action_len)
         self.q_file = q_file
-        self.conv_file = conv_file
-        self.custom_params = custom_params if custom_params else {}
-        self.custom_render = self.custom_params.get('render', None)
-        self.sleep_time = sleep_time
-        self.episodes = episodes
         self.train_render = train_render
+        self.train_render_interval = train_render_interval
+        self.train_render_clear = train_render_clear
+        self.termination_type = termination_type
+        self.termination_precision = termination_precision
+        self.max_train_episodes = max_train_episodes
         self.info_episodes = info_episodes
         self.eta = eta
         self.lmd = lmd
@@ -81,21 +83,15 @@ class Agent:
             self.q_table = self.build_q_table(initial_q_mode)
         self.q_table_backup = self.q_table.copy()
 
-        # Config all the necessary parameters
-        if config_file:
-            config = yaml.load(open(config_file))
-            self.load_config(config=config)
-        else:
-            self.epsilon_base = epsilon_base
-            self.epsilon_decay_rate = epsilon_decay_rate
-            self.gamma = gamma
-            self.learning_rate = learning_rate
-            self.phi = phi
+        self.epsilon_base = epsilon_base
+        self.epsilon_decay_rate = epsilon_decay_rate
+        self.gamma = gamma
+        self.learning_rate = learning_rate
+        self.phi = phi
 
         self.B = 100
         self.A = self.learning_rate * self.B
         self.heuristic = heuristic
-        self.quit_mode = quit_mode
         # Eligibility Trace
         self.eligibility_trace = self.build_q_table(mode="zero")
         def _clear(self, target, mode="zero"):
@@ -104,6 +100,9 @@ class Agent:
                 df[col].values[:] = 0
         # Set eligitbility trace to zero
         self._clear_et = functools.partial(_clear, self, "eligibility_trace")
+
+        # This is an instance of Result that is used to store all results during training
+        self.result = result
 
         #self.train_dict = {
         #    'Q_learning': self.Q_learning_train,
@@ -143,12 +142,12 @@ class Agent:
     def save_reward(self):
         return np.array(self.reward_per_episode).mean()
 
-    def render(self, state=None, sleep=True):
+    def render(self):
         if self.train_render:
-            if self.custom_render:
-                self.custom_render(state=state)
-                if sleep:
-                    time.sleep(self.sleep_time)
+            if self.train_render_clear:
+                os.system("clear")
+            time.sleep(self.train_render_interval)
+            self.env.render()
 
     def display_episode_info(self, episode, q_sum, episode_reward, force=False):
         if force or not episode % self.info_episodes:
@@ -190,9 +189,6 @@ class Agent:
     def epsilon_decay(self, episode):
         self.epsilon = self.epsilon_base * self.epsilon_decay_rate/episode
 
-    def epsilon_unchanged(self, episode):
-        pass
-
     def epsilon_greedy_policy(self, state):
         actions = self.action_filter(state)
         if (len(actions) == 1):
@@ -214,9 +210,6 @@ class Agent:
         else:
             all_Q = Q_table.loc[state, :]
         return all_Q.squeeze().idxmax()
-        #mval = all_Q.max().max()
-        #allmaxactions = all_Q[all_Q == mval].dropna(axis=1).columns
-        #return np.random.choice(allmaxactions)
 
     def choose_heuristic_action(self, state):
         available_actions = self.available_actions(state)
@@ -233,10 +226,10 @@ class Agent:
     def train(self, algorithm="Q_learning"):
         episode = 0
         stop = False
-        q_sum = np.zeros((self.episodes,))
-        episode_total_reward = np.zeros((self.episodes,))
+        q_sum = np.zeros((self.max_train_episodes,))
+        episode_total_reward = np.zeros((self.max_train_episodes,))
         self.epsilon = self.epsilon_base
-        while episode < self.episodes:
+        while episode < self.max_train_episodes:
             state = self.env.reset()
             action = self.epsilon_greedy_policy(state=state)
             if algorithm == "SARSA_lambda" or algorithm == "Q_lambda":
@@ -247,8 +240,7 @@ class Agent:
             # Total reward of one episode
             episode_reward = 0
             while not done:
-                if self.train_render:
-                    self.env.render()
+                self.render()
                 q = self.q_table.at[state, action]
                 next_state, reward, done, info = self.env.step(action)
                 next_action = self.epsilon_greedy_policy(state=next_state)
@@ -269,11 +261,6 @@ class Agent:
                 td_error = td_target - q
                 if algorithm == "SARSA_lambda" or algorithm == "Q_lambda":
                     self.eligibility_trace.at[state, action] += 1
-                    ##print(self.q_table)
-                    ##self.q_table = pd.DataFrame(self.q_table.values * self.alpha * td_error * self.eligibility_trace.values, 
-                    ##        columns=self.q_table.columns, index=self.q_table.index)
-                    ##print(self.q_table)
-                    ##self.eligibility_trace = self.eligibility_trace.multiply(self.gamma * self.lmd)
                     for s in self.env.observation_space:
                         for a in self.env.action_space:
                             self.q_table.at[s, a] += self.learning_rate* td_error * self.eligibility_trace.at[s, a]
@@ -295,10 +282,12 @@ class Agent:
             self.display_episode_info(episode=episode, q_sum=q_sum, episode_reward=episode_reward)
             episode += 1
             self.epsilon_decay(episode)
+            if self.termination_type == "loss" and episode >= 2:
+                convergence = abs(q_sum[episode - 1] - q_sum[episode - 2])
+                if convergence < self.termination_precision:
+                    break
             q_sum_filename = f"{self.env.name}-{algorithm}-train-Q_sum.txt"
             self.save_conv(self.result_path / q_sum_filename, q_sum)
-            #if episode > 2 and abs(conv[-1] - conv[-2]) < self.phi:
-            #    break
         self.display_episode_info(episode=episode, q_sum=q_sum, episode_reward=episode_reward, force=True)
         return {
             "episode_number": episode,
@@ -306,183 +295,9 @@ class Agent:
             "episode_total_reward": episode_total_reward,
         }
 
-    def SARSA_train(self):
-        episode = 1
-        stop = False
-        self.conv = np.array([0])
-        self.epsilon = self.epsilon_base
-        while episode < self.episodes:
-            state = self.env.reset()
-            # self.epsilon_decay(episode)
-            action = self.epsilon_greedy_policy(state=state)
-            done = False
-            step = 1
-            self.display_episode_info(episode=episode)
-            while not done:
-                if self.train_render:
-                    self.env.render()
-                q_predict = self.q_table.at[state, action]
-                next_state, reward, done, info = self.env.step(action)
-                if done:
-                    q = reward
-                    next_action = None
-                else:
-                    # Here is the critical difference
-                    next_action = self.epsilon_greedy_policy(state=next_state)
-                    q = reward + self.gamma * self.q_table.at[next_state, next_action]
-                self.q_table.at[state, action] += self.alpha * (q - q_predict) 
-                state = next_state
-                action = next_action
-                step += 1
-            episode += 1
-            self.conv = np.append(self.conv, self.q_table.sum().sum())
-            if episode > 2 and abs(self.conv[-1] - self.conv[-2]) < 1e-3:
-                episode_return = episode
-                episode = self.episodes
-            self.save_q()
-            self.save_conv()
-        return episode_return
-
-    def SARSA_lambda_train(self):
-        episode = 1
-        self.conv = np.array([0])
-        self.epsilon = self.epsilon_base
-        while episode < self.episodes:
-            state = self.env.reset()
-            action = self.epsilon_greedy_policy(state)
-            self._clear_et()
-            self.display_episode_info(episode=episode)
-            self.render()
-            done = False
-            step = 1
-            current_reward = 0
-            #pdb.set_trace()
-            while not done:
-                q_predict = self.q_table.at[state, action]
-                next_state, reward, done, info = self.env.step(action)
-                current_reward += reward
-                if done:
-                    delta = reward - q_predict
-                    next_action = None
-                else:
-                    next_action = self.epsilon_greedy_policy(state=next_state)
-                    # TD error
-                    delta = reward + self.gamma * self.q_table.at[next_state, next_action] - q_predict
-                self.eligibility_trace.at[state, action] += 1
-                # Iterate all state and action and update the Q value
-                for s in self.env.observation_space:
-                    for a in self.env.action_space:
-                        self.q_table.at[s, a] += self.alpha * delta * self.eligibility_trace.at[s, a]
-                        self.eligibility_trace.at[s, a] *= self.lmd * self.gamma
-                #print(f"DEBUG: state: {state}, action: {action}, next_state: {next_state}, next_action: {next_action}")
-                state = next_state
-                action = next_action
-                if self.render_flag:
-                    self.env.render()
-                step += 1
-                #pdb.set_trace()
-            episode += 1
-            self.conv = np.append(self.conv, self.q_table.sum().sum())
-            if episode > 2 and abs(self.conv[-1] - self.conv[-2]) < 1e-3:
-                episode_return = episode
-                episode = self.episodes
-            self.save_q()
-            self.save_conv()
-        return episode_return
-
-    def Q_learning_train(self):
-        episode = 1
-        conv = np.array([0])
-        self.epsilon = self.epsilon_base
-        while episode < self.episodes:
-            state = self.env.reset()
-            # self.epsilon_decay(episode)
-            done = False
-            step = 1
-            self.display_episode_info(episode=episode)
-            while not done:
-                if self.render_flag:
-                    self.env.render()
-                action = self.epsilon_greedy_policy(state=state)
-                q_predict = self.q_table.at[state, action]
-                next_state, reward, done, info = self.env.step(action)
-                if done:
-                    q = reward
-                else:
-                    # Here is the critical difference
-                    q = reward + self.gamma * self.q_table.loc[next_state, :].max()
-                self.q_table.at[state, action] += self.alpha * (q - q_predict) 
-                state = next_state
-                step += 1
-            episode += 1
-            conv = np.append(conv, self.q_table.sum().sum())
-            if episode > 2 and abs(conv[-1] - conv[-2]) < 1e-3:
-                episode_return = episode
-                episode = self.episodes
-            self.save_q()
-            conv_filename = f"{self.env.name}-{algorithm}-train-Q_convergence.txt"
-            self.save_conv(self.result_path / conv_filename, conv)
-        return episode_return
-
-    def DoubleQ_train(self):
-        total_round = self._train_round
-        train_round = 1
-        trainb_round = 1
-        astep = 1
-        bstep = 1
-        stop = False
-        self.conv = np.array([0])
-        while not stop:
-            self._init()
-            state = random.choice(self._init_state)
-            self._display(state=state)
-            end = False
-            while not end:
-                Q_average = (self._q_table + self._qb_table)/2
-                action = self.choose_action(state=state, itertime=train_round, Q_table=Q_average)
-                reward = self._reward_func(state=state, action=action)
-                next_state = self._transition_func(state=state, action=action)
-                # Here is the Double Q process
-                e = np.random.rand()
-                if e < 0.5:
-                    update_Q, estimate_Q = self._q_table, self._qb_table
-                    astep += 1
-                    com_step = astep
-                    #train_round += 1
-                    #tr = train_round
-                else:
-                    update_Q, estimate_Q = self._qb_table, self._q_table
-                    bstep += 1
-                    com_step = bstep
-                    #trainb_round += 1
-                    #tr = trainb_round
-                q_predict = update_Q.loc[[state], [action]].values[0][0]
-                max_action = self.argmax(update_Q, state=next_state)
-                if next_state in self._end_state:
-                    q = reward
-                    end = True
-                else:
-                    q = reward + self._gamma * estimate_Q.loc[[next_state], [max_action]].values[0][0]
-                update_Q.loc[[state], [action]] += 0.1 * (q - q_predict)#self.alpha_log(train_round) * (q - q_predict)
-                state = next_state
-                self._display(state=state)
-            train_round += 1
-
-            Q_average = (self._q_table + self._qb_table)/2
-            if self._quit_mode == 'c':
-                if train_round >= self._maximum_iteration:
-                    raise OutOfRangeException('The iteration time has exceeded the maximum value')
-                else:
-                    stop = self.convergence()
-            else:
-                self.conv = np.append(self.conv, Q_average.sum().sum())
-                stop = (train_round == total_round)
-            self.save_q(Q_table=Q_average)
-            self._save_conv()
-        return self.conv
-
     def run(self):
         state = self.env.reset()
+        self.env.render()
         done = False
         total_reward = 0
         while not done:
@@ -492,10 +307,6 @@ class Agent:
             total_reward += reward
             state = next_state
         print(f"Total reward: {total_reward}")
-
-    def plot_q_sum(self):
-        plt.figure()
-        plt.plot(range(len(self.conv)), self.conv)
 
     def exlongterm(self):
         return self._q_table.max(axis=1).sum()/self._dimension[0]
@@ -527,4 +338,5 @@ class Agent:
             return True
         else:
             return False
+
 

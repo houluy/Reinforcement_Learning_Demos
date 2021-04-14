@@ -10,7 +10,7 @@ class Result:
         evaluation_objective: str,
         objective_values: list,
         metrics: list,
-        episodes: int
+        max_train_episodes: int
     ):
         """ Wrap the results 
             Structure(dict-like style):
@@ -21,6 +21,7 @@ class Result:
                 @variable_name: Name of the variable.
                 @variable_values: All possible values of the variable
                 @metrics: Name of all metrics
+                @max_train_episodes: Maximum of number of episodes
         """
         self.algorithms = algorithms
         self.alg_len = len(self.algorithms)
@@ -32,8 +33,8 @@ class Result:
         self.metrics = metrics
         self.met_len = len(self.metrics)
         self.met_ind = dict(zip(self.metrics, range(self.met_len)))
-        self.episodes = episodes
-        self.metric_values = np.zeros((self.alg_len, self.obj_len, self.met_len, self.episodes))
+        self.max_train_episodes = max_train_episodes
+        self.metric_values = np.zeros((self.alg_len, self.obj_len, self.met_len, self.max_train_episodes))
         self._short_name_dict = {
             "alg": "algorithms",
             "var": "objective_values",
