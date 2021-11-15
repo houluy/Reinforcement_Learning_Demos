@@ -1,6 +1,8 @@
-====================
-Demos for Q_learning
-====================
+================================
+Demos for Reinforcement Learning
+================================
+
+UNDER DEVELOPMENT!!
 
 ------------------
 How to prepare

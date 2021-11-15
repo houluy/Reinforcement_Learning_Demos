@@ -11,6 +11,7 @@ import pathlib
 import functools
 
 from src.analysis import Result
+from .Q import Q, EligibilityTrace
 
 file_path = pathlib.Path(__file__).parent
 defaultQfile = file_path / 'Q.csv'
@@ -67,12 +68,7 @@ class Agent:
         self.eta = eta
         self.lmd = lmd
 
-        self._q_init_func = {
-            "large": lambda dim: 100*np.ones(dim),
-            "zero": np.zeros,
-            "small": lambda dim: -100*np.ones(dim),
-            "random": np.random.random,
-        }
+        
         
         # Generate Q table
         if load:
@@ -82,6 +78,7 @@ class Agent:
         else:
             self.q_table = self.build_q_table(initial_q_mode)
         self.q_table_backup = self.q_table.copy()
+        self.double_q_table = self.build_q_table(initial_q_mode)
 
         self.epsilon_base = epsilon_base
         self.epsilon_decay_rate = epsilon_decay_rate
@@ -164,14 +161,17 @@ class Agent:
 
     def build_q_table(self, mode="zero"):
         func = self._q_init_func[mode]
-        index = pd.MultiIndex.from_tuples(self.env.observation_space)
-        columns = self.env.action_space
-        Q_table = df(
-            func(self.dimension), # Q value initialization
-            index=index,
-            columns=columns,
-        )
-        return Q_table
+        Q_table = Q(
+    #def build_q_table(self, mode="zero"):
+    #    func = self._q_init_func[mode]
+    #    index = pd.MultiIndex.from_tuples(self.env.observation_space)
+    #    columns = self.env.action_space
+    #    Q_table = df(
+    #        func(self.dimension), # Q value initialization
+    #        index=index,
+    #        columns=columns,
+    #    )
+    #    return Q_table
 
     def step_ending(self, step=10):
         self.step_end = True
@@ -189,7 +189,9 @@ class Agent:
     def epsilon_decay(self, episode):
         self.epsilon = self.epsilon_base * self.epsilon_decay_rate/episode
 
-    def epsilon_greedy_policy(self, state):
+    def epsilon_greedy_policy(self, state, q_table=None):
+        if q_table is None:
+            q_table = self.q_table
         actions = self.action_filter(state)
         if (len(actions) == 1):
             return actions[0]
@@ -197,11 +199,13 @@ class Agent:
             if (np.random.uniform() < self.epsilon):
                 action = random.choice(actions)
             else:
-                action = self.argmax(self.q_table, state, actions)
+                action = self.argmax(q_table, state, actions)
             return action
 
-    def greedy_policy(self, state):
-        return self.argmax(self.q_table, state=state, available=self.action_filter(state))
+    def greedy_policy(self, state, q_table=None):
+        if q_table is None:
+            q_table = self.q_table
+        return self.argmax(q_table, state=state, available=self.action_filter(state))
 
     @staticmethod
     def argmax(Q_table, state, available=None):
@@ -223,6 +227,29 @@ class Agent:
                 action = all_Q.idxmax()
             return action
 
+    def train_double_q(self):
+        episode = 0
+        stop = False
+        self.epsilon = self.epsilon_base
+        while episode < self.max_train_episodes:
+            state = self.env.reset()
+            q_table = self.q_table + self.double_q_table
+            action = self.epsilon_greedy_policy(state=state, q_table=q_table)
+            done = False
+            step = 1
+            episode_reward = 0
+            while not done:
+                self.render()
+                rnd = random.rand()
+                if rnd > 0.5:  # Update QA
+                    Q_a = self.q_table
+                    Q_b = self.double_q_table
+                else:
+                    Q_a = self.double_q_table
+                    Q_b = self.q_table
+                q = Q_a[state, action]
+
+
     def train(self, algorithm="Q_learning"):
         episode = 0
         stop = False
@@ -231,7 +258,11 @@ class Agent:
         self.epsilon = self.epsilon_base
         while episode < self.max_train_episodes:
             state = self.env.reset()
-            action = self.epsilon_greedy_policy(state=state)
+            if algorithm == "Double_Q":
+                q_table = self.q_table + self.double_q_table
+            else:
+                q_table = self.q_table
+            action = self.epsilon_greedy_policy(state=state, q_table=q_table)
             if algorithm == "SARSA_lambda" or algorithm == "Q_lambda":
                 self._clear_et()
             # self.epsilon_decay(episode)

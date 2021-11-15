@@ -5,7 +5,6 @@ verify_ssl = true
 [packages]
 pandas = "==0.22.0"
 colorline = "==1.0.3"
-pyyaml = "==3.12"
 numpy = "*"
 matplotlib = "*"
 sphinx = "*"
